@@ -1,0 +1,164 @@
+=======================================================================
+
+Plesk increase storage space by removing backups:
+- Use WinSCP (un: root)
+- In console:
+- - cd /var/lib/psa/dumps/
+- - cd /repair/var/lib/psa/dumps/
+- - rm -rf *
+
+- - Remove old bin logs:
+- - - See /var/lib/mysql/mysql-bin.index to check which file is currently being used 
+- - - Remove files, which are not used:
+- - - - /var/lib/mysql -> mysql-bin.000001 .. n
+
+Check available disk space:
+df -h
+
+df -h /repair
+df -i /repair
+
+Strato: 030-300 146 0 (nur Geschäftszeiten)
+=======================================================================
+
+Links:
+- https://react.i18next.com/latest/trans-component
+- https://react-bootstrap.github.io/components/alerts/
+
+=======================================================================
+Test locally:
+
+npm install -g serve
+
+npm run build
+
+serve -s build
+
+=======================================================================
+
+Ways to update geoip-lite data:
+
+1) node ./node_modules/geoip-lite/scripts/updatedb.js
+
+2) Or, if you really want, run the update once by require('geoip-lite/scripts/updatedb.js')
+
+=======================================================================
+
+- Plesk / Apache & Nginx settings -> uncheck Proxy mode 
+- Plesk / Node / Custom environment variables -> SITE_MODE: STAGING | LIVE
+- Copy server files WITH node_modules, THEN install on Plesk
+
+=======================================================================
+
+Deploy to staging:
+git remote add origin https://github.com/zime-lv/dev-zime-lv.git
+git remote set-url origin https://github.com/zime-lv/dev-zime-lv.git
+git run deploy
+
+Deploy to live:
+git remote set-url origin https://github.com/zime-lv/zime-lv.git
+git run deploy
+
+Check setting:
+git remote -v
+
+git remote remove origin
+git remote add origin https://zime-admin@dev.zime.lv/plesk-git/dev-zime-lv-server.git
+git remote show origin
+git push -u origin master
+git push origin master
+
+=======================================================================
+
+Creating a develop branch:
+-------------------------------------
+git checkout -b develop master
+
+Deploying a develop branch:
+-------------------------------------
+git checkout master
+git merge --no-ff develop
+[git tag -a 1.0.0]
+npm run deploy
+git checkout develop
+
+Creating a feature branch:
+-------------------------------------
+git checkout -b myfeature develop
+
+Incorporating a finished feature on develop:
+-------------------------------------
+git checkout develop
+git merge --no-ff myfeature
+git branch -d myfeature
+git push origin develop
+
+Creating a release branch:
+-------------------------------------
+git checkout -b release-1.0.3 develop
+### ./bump-version.sh 1.0.0
+$ git commit -a -m "Bumped version number to 1.0.3"
+
+Finishing a release branch:
+-------------------------------------
+git checkout master
+git merge --no-ff release-1.0.3
+git tag -a 1.0.3 -m "Released v1.0.3 for dev.zime.lv"
+git checkout develop
+git merge --no-ff release-1.0.3
+git branch -d release-1.0.3
+
+Creating the hotfix branch:
+-------------------------------------
+git checkout -b hotfix-1.0.2 master
+### ./bump-version.sh 1.0.2 !!! DO NOT FIX YET !!!
+git commit -a -m "Bumped version number to 1.0.2"
+### fix the bug
+git commit -m "Fixed severe production problem"
+
+Finishing a hotfix branch:
+-------------------------------------
+git checkout master
+git merge --no-ff hotfix-1.0.1
+[git tag -a 1.0.1]
+git checkout develop
+git merge --no-ff hotfix-1.0.1
+git branch -d hotfix-1.0.1
+
+
+
+Local git repository:
+git init
+git remote add zimelv_tasks_bak D:\repositories\zime.lv\tasks\.git
+git add .
+git commit -m 'initial commit'
+git clone C:\www\zime.lv\tasks
+(checkout to master)
+
+git remote add zimelv_client_bak D:\repositories\zime.lv\client\.git
+git remote add zimelv_server_bak D:\repositories\zime.lv\server\.git
+
+git config --bool core.bare true
+git push --set-upstream zimelv_server_bak master
+git push zimelv_server_bak
+git push zimelv_tasks_bak
+
+git diff --cached --name-only --diff-filter=A
+
+git remote rm origin
+
+git push zimelv_server_bak master
+
+git push --set-upstream zimelv_server_bak master
+
+git clone C:\www\zime.lv\server
+
+git branch --set-upstream-to=zimelv_server_bak/master master
+
+git fetch zimelv_server_bak master:master
+
+git fetch zimelv_server_bak
+
+git branch -u zimelv_server_bak/master master
+
+git pull origin zimelv_server_bak

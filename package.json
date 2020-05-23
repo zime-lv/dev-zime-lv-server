@@ -1,0 +1,45 @@
+{
+  "name": "dev-zime-lv-server",
+  "homepage": ".",
+  "version": "1.0.3",
+  "description": "ZIME LV Development Server",
+  "private": true,
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "file-type": "^14.5.0",
+    "geoip-lite": "^1.4.2",
+    "mysql": "^2.18.1",
+    "nodemailer": "^6.4.6",
+    "object-hash": "^2.0.3",
+    "serve-favicon": "^2.5.0",
+    "socket.io": "^2.3.0",
+    "uuid": "^8.1.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^2.2.0",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11",
+    "webpack-node-externals": "^1.7.2"
+  },
+  "scripts": {
+    "start": "nodemon index.js",
+    "build": "webpack",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -b master -d build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zime-lv/dev-zime-lv.git"
+  },
+  "keywords": [
+    "zime, local currencies, regional currencies"
+  ],
+  "author": "Armands Strazds",
+  "license": "ISC",
+  "optionalDependencies": {
+    "bufferutil": "^4.0.1",
+    "utf-8-validate": "^5.0.2"
+  }
+}
