@@ -1,4 +1,6 @@
 {
-  "currencies": [],
+  "currencies": null,
+  "defaultCurrency": ["Z"],
+  "currencyCreationAllowed": true,
   "logo": "gfx/zlogo_light.png"
 }
