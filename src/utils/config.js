@@ -1,4 +1,12 @@
 require("dotenv").config();
+const crypto = require("./crypto");
+
+// Encrypts output
+// var output = crypto.encrypt(process.env.DEV_DB_PASS);
+// console.log(output);
+
+// Decrypts output
+// console.log(crypto.decrypt(process.env.DEV_DB_PASS));
 
 const SITE_MODE =
   typeof process.env.SITE_MODE !== "undefined"
@@ -13,7 +21,7 @@ const dev = {
   db: {
     host: process.env.DEV_DB_HOST,
     user: process.env.DEV_DB_USER,
-    password: process.env.DEV_DB_PASS,
+    password: crypto.decrypt(process.env.DEV_DB_PASS),
     database: process.env.DEV_DB,
   },
 };
@@ -25,7 +33,7 @@ const staging = {
   db: {
     host: process.env.STAGING_DB_HOST,
     user: process.env.STAGING_DB_USER,
-    password: process.env.STAGING_DB_PASS,
+    password: crypto.decrypt(process.env.STAGING_DB_PASS),
     database: process.env.STAGING_DB,
   },
 };
@@ -37,7 +45,7 @@ const prod = {
   db: {
     host: process.env.PROD_DB_HOST,
     user: process.env.PROD_DB_USER,
-    password: process.env.PROD_DB_PASS,
+    password: crypto.decrypt(process.env.PROD_DB_PASS),
     database: process.env.PROD_DB,
   },
 };

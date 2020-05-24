@@ -138,6 +138,16 @@ const userRequest = (args) => {
 
       // TODO: Consider using promise here
 
+      let settings = {
+        currencies: null,
+        // currency: "Z",
+        currencyCreationAllowed: true,
+        logo: "gfx/zlogo_light.png",
+      };
+
+      // const settings = require("./settings.json");
+      userData.settings = settings;
+
       db.signInUser({
         // system
         req: data.req,

@@ -41,24 +41,6 @@ const process = (args) => {
         // return true;
       }
 
-      // if (args.req === "init user" && args.status === "success") {
-      //   const data = args;
-      //   const userData = data.data;
-      //   db.signInUser({
-      //     // system
-      //     req: data.req,
-      //     session: data.session,
-      //     reqData: userData,
-      //     onStatusChange: onStatusChange,
-      //     onError: onRequestError,
-
-      //     // user
-      //     email: userData.email,
-      //     pw: userData.password,
-      //   });
-      //   // return true;
-      // }
-
       return processUserRequest(args);
       break;
 
