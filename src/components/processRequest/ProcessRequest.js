@@ -11,9 +11,14 @@ const { v4: uuidv4 } = require("uuid");
 const db = require("../db/db");
 const processError = require("../processError/ProcessError");
 const processEvent = require("../processEvent/ProcessEvent");
+const utoken = require("../../utils/utoken");
 
 let onResult = null;
 
+/**
+ * Status change event handler
+ * @param {object} args
+ */
 const onStatusChange = (args) => {
   let res;
 
@@ -26,6 +31,10 @@ const onStatusChange = (args) => {
   }
 };
 
+/**
+ * Error handler
+ * @param {object} args
+ */
 const onRequestError = (args) => {
   console.log("onError: ", args);
   args.type = "userRequest";
@@ -36,27 +45,61 @@ const onRequestError = (args) => {
   }
 };
 
+// const validateSession = (session, email) => {
+//   const valid = utoken.validate(session, email);
+
+//   if (!valid) {
+//     onRequestError({
+//       // system
+//       req: "validate session",
+//       // session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onRequestError,
+
+//       // error
+//       error: { code: "INVALID_SESSION" },
+//       context: ["ProcessRequest.js", "validateSession", "not valid"],
+//       query: null,
+//     });
+//     return false;
+//   }
+//   return true;
+// };
+
+// const isSecureSession = (token) => {
+//   return token.length > 40;
+// };
+
+// const validateSessionTS = (token) => {
+//   if (!isSecureSession(token)) return true;
+
+//   const valid = utoken.validate(session, email);
+
+//   onRequestError({
+//     // system
+//     req: "validate session",
+//     // session: session,
+//     onStatusChange: onStatusChange,
+//     onError: onRequestError,
+
+//     // error
+//     error: { code: "INVALID_SESSION" },
+//     context: ["ProcessRequest.js", "validateSession", "not valid"],
+//     query: null,
+//   });
+// };
+
 const userRequest = (args) => {
   data = args.data;
   onResult = args.onResult;
   const userData = data.data;
 
+  // if (!validateSessionTS(token)) {
+  //   return false;
+  // }
+
   switch (data.req) {
     case "get account data":
-      // db.transferV2U({
-      //   // system
-      //   req: "transfer V2U",
-      //   session: data.session,
-      //   reqData: userData,
-      //   onStatusChange: onStatusChange,
-      //   onError: onRequestError,
-
-      //   // user
-      //   recipient_id: userData.uid,
-      // });
-
-      // // TODO: consider using a promise here
-
       db.getAccount({
         // system
         req: data.req,
@@ -68,6 +111,7 @@ const userRequest = (args) => {
         // user
         uid: userData.uid,
         timeout: userData.timeout,
+        checkTimeout: userData.checkTimeout,
       });
       break;
 
@@ -82,6 +126,7 @@ const userRequest = (args) => {
 
         // user
         recipient_id: userData.uid,
+        // token: userData.token,
       });
 
       break;
@@ -124,6 +169,18 @@ const userRequest = (args) => {
      * Sign in user
      */
     case "sign in user":
+      db.getUriSettings({
+        // system
+        req: "get uri settings",
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+
+        // user
+        uri: userData.uri,
+      });
+
       db.initUser({
         // system
         req: "init user",
@@ -138,15 +195,17 @@ const userRequest = (args) => {
 
       // TODO: Consider using promise here
 
-      let settings = {
-        currencies: null,
-        // currency: "Z",
-        currencyCreationAllowed: true,
-        logo: "gfx/zlogo_light.png",
-      };
+      // let settings = {
+      //   currencies: null,
+      //   // currency: null,
+      //   currencyCreationAllowed: true,
+      //   logo: "gfx/zlogo_light.png",
+      // };
 
       // const settings = require("./settings.json");
-      userData.settings = settings;
+      // userData.settings = settings;
+
+      // get URI settings
 
       db.signInUser({
         // system
@@ -167,6 +226,8 @@ const userRequest = (args) => {
      * Update last seen user
      */
     case "update last seen user":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.lastSeenUser({
         // system
         req: data.req,
@@ -208,6 +269,8 @@ const userRequest = (args) => {
      * Change password
      */
     case "change password":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.mergeUser({
         // system
         req: data.req,
@@ -251,6 +314,8 @@ const userRequest = (args) => {
      * Register account
      */
     case "register account":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.mergeUser({
         // system
         req: data.req,
@@ -275,6 +340,8 @@ const userRequest = (args) => {
       break;
 
     case "update user":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.mergeUser({
         // system
         req: data.req,
@@ -403,6 +470,8 @@ const userRequest = (args) => {
       break;
 
     case "get user":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.getUser({
         // system
         req: data.req,
@@ -447,6 +516,8 @@ const userRequest = (args) => {
       break;
 
     case "register user currency":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.mergeUserCurrency({
         // system
         req: data.req,
@@ -787,6 +858,8 @@ const userRequest = (args) => {
       break;
 
     case "get tan":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.getTAN({
         // system
         req: data.req,
@@ -804,6 +877,8 @@ const userRequest = (args) => {
       break;
 
     case "submit tan":
+      // if (!validateSession(data.session, userData.email)) return;
+
       db.processTAN({
         // system
         req: data.req,

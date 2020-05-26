@@ -5,7 +5,6 @@ const process = (args) => {
   switch (type) {
     case "userRequest":
       return processUserRequest(args);
-      break;
 
     default:
       break;

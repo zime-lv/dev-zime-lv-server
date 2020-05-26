@@ -520,6 +520,52 @@ const initUser = ({
 };
 
 /**
+ * Get URI settings
+ * @param {*} param0
+ */
+const getUriSettings = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  uri = null,
+}) => {
+  let name = [];
+  let sql = [];
+  let values = [];
+
+  name[0] = "SELECT FROM uri_settings";
+  sql[0] = `
+    SELECT settings
+    FROM uri_settings
+    WHERE uri = ?
+    `;
+  values[0] = [uri];
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  return db.mergeIntoDb(queries);
+};
+
+/**
  * Sign in user (for log in)
  * @param {*} param0
  */
@@ -559,6 +605,17 @@ const signInUser = ({
     `; // suspended account status = 2
   values[n] = [email, hash(`${salt}${pw}`)];
 
+  // n++;
+  // name[n] = "SELECT users";
+  // sql[n] = `
+  //   SELECT u.uid, u.firstname, u.lastname, u.language, u.status,
+  //   c.name AS currency_name, c.abbr AS currency_abbr, c.rate AS currency_rate, c.status AS currency_status
+  //   FROM users AS u
+  //   INNER JOIN currencies AS c ON c.abbr = u.currency_id
+  //   WHERE u.email = ? AND u.pw = ?
+  //   `; // suspended account status = 2
+  // values[n] = [email, hash(`${salt}${pw}`)];
+
   n++;
   name[n] = "INSERT INTO user_connection";
   sql[n] = `
@@ -597,6 +654,9 @@ const signInUser = ({
       session: session,
       onStatusChange: onStatusChange,
       onError: onError,
+
+      // tags
+      tags: { email: email },
 
       // query
       name: name[0],
@@ -653,8 +713,12 @@ const lastSeenUser = ({
       req: req,
       reqData: reqData,
       session: session,
-      onStatusChange: () => {}, // onStatusChange,
+      // onStatusChange: () => {}, // onStatusChange,
+      onStatusChange: onStatusChange,
       onError: onError,
+
+      // tags
+      tags: { email: email },
 
       // query
       name: name[0],
@@ -681,19 +745,31 @@ const getAccount = ({
   // user
   uid = null,
   timeout = 5 * 60, // seconds
+  checkTimeout = true,
 }) => {
   let name = [];
   let sql = [];
   let values = [];
 
+  // name[0] = "SELECT users";
+  // sql[0] = `
+  //   SELECT uid, firstname, lastname, email, sequence, acc_curr, acc_cred, acc_save, website, phone, last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) seconds_since_last_seen, status, ts
+  //   FROM users
+  //   WHERE uid = ?
+  //   AND (? OR TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) <= ?)
+  //   `; // suspended account status = 2
+  // values[0] = [uid, checkTimeout, timeout];
+
   name[0] = "SELECT users";
   sql[0] = `
-    SELECT uid, firstname, lastname, email, sequence, acc_curr, acc_cred, acc_save, website, phone, last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) seconds_since_last_seen, status, ts 
-    FROM users 
-    WHERE uid = ?
-    AND TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) <= ?
+    SELECT u.uid, u.firstname, u.lastname, u.email, u.sequence, u.acc_curr, u.acc_cred, u.acc_save, u.website, u.phone, u.last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), u.last_seen)) AS seconds_since_last_seen, u.status, u.ts 
+    , s.token, s.iv
+    FROM users AS u
+    INNER JOIN sessions AS s ON s.email = u.email
+    WHERE u.uid = ?
+    AND (? OR TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), u.last_seen)) <= ?)
     `; // suspended account status = 2
-  values[0] = [uid, timeout];
+  values[0] = [uid, checkTimeout, timeout];
 
   let queries = [
     {
@@ -911,6 +987,71 @@ const getShares = ({
       values: values[1],
     },
   ];
+
+  return db.mergeIntoDb(queries);
+};
+
+const mergeSession = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  email = null,
+  token = null,
+  iv = null,
+  status = 0,
+}) => {
+  let name = [];
+  let sql = [];
+  let values = [];
+
+  name[0] = "INSERT INTO sessions";
+  sql[0] = `
+    INSERT INTO sessions (email, token, iv, status, created)
+    VALUES (?, ?, ?, ?, UTC_TIMESTAMP())
+    ON DUPLICATE KEY UPDATE 
+    token = COALESCE(?, token)
+    , iv = COALESCE(?, iv)
+    , status = COALESCE(?, status)
+    , created = UTC_TIMESTAMP()
+  `;
+  values[0] = [
+    /* Insert values */
+    email,
+    token,
+    iv,
+    status,
+
+    /* Update values */
+    token,
+    iv,
+    status,
+  ];
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // user
+      email: null,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  // console.log("mergeIntoDb: ", queries);
 
   return db.mergeIntoDb(queries);
 };
@@ -2595,6 +2736,7 @@ const transferV2U = ({
   fromAccount = "vault",
   toAccount = "acc_save",
   recipient_id = null,
+  // token = null,
   amount = 48,
   description = "allowance",
   reviser = "VAULT",
@@ -2610,6 +2752,7 @@ const transferV2U = ({
     });
     return;
   }
+
   let name = []; // query name
   let sql = [];
   let values = [];
@@ -2626,15 +2769,17 @@ const transferV2U = ({
 
   name[1] = "UPDATE recipient";
   sql[1] = `
-  UPDATE users
-  SET ${toAccount} = ${toAccount} + ?,
-  allowance_date = DATE(UTC_TIMESTAMP()),
-  reviser = ?,
-  workplace = ?
-  WHERE uid = ?
-  AND (allowance_date < DATE(UTC_TIMESTAMP()) OR allowance_date IS null)
+  UPDATE users AS u
+  INNER JOIN sessions AS s ON s.email = u.email 
+  AND s.token = ?
+  SET u.${toAccount} = u.${toAccount} + ?,
+  u.allowance_date = DATE(UTC_TIMESTAMP()),
+  u.reviser = ?,
+  u.workplace = ?
+  WHERE u.uid = ?
+  AND (u.allowance_date < DATE(UTC_TIMESTAMP()) OR u.allowance_date IS null)
   `;
-  values[1] = [amount, reviser, workplace, recipient_id];
+  values[1] = [session, amount, reviser, workplace, recipient_id];
 
   name[2] = "INSERT INTO transactions";
   sql[2] = `
@@ -3326,6 +3471,7 @@ module.exports = {
   // addCurrency: addCurrency,
   getSequence: getSequence,
   mergeUser: mergeUser,
+  mergeSession: mergeSession,
   mergeBusiness: mergeBusiness,
   mergeCurrency: mergeCurrency,
   // emitCurrency: emitCurrency,
@@ -3339,6 +3485,7 @@ module.exports = {
   transferV2U: transferV2U,
   // transferP2B: transferP2B,
   initUser: initUser,
+  getUriSettings: getUriSettings,
   signInUser: signInUser,
   lastSeenUser: lastSeenUser,
   resetPassword: resetPassword,

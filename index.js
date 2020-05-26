@@ -4,7 +4,13 @@ const PRODUCTION_MODE = os.hostname() !== "Suranadira";
 const express = require("express");
 const app = express();
 const server = require("http").Server(app); // NEVER use https here!!
-const io = require("socket.io")(server, { serveClient: false });
+const io = require("socket.io")(server, {
+  serveClient: false,
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  reconnectionAttempts: 99999,
+});
 
 const { v4: uuidv4 } = require("uuid");
 
@@ -27,16 +33,42 @@ app.use(express.static(__dirname + "/_client"));
 app.use(express.json()); // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
 
+const allClients = [];
+
 const onProcessResult = (args) => {
   if (args !== false) {
     console.log("SENDING", args, "TO", args.session);
 
     io.in(args.session).emit("onDataReceived", args);
+
+    if (typeof args.socketAction !== "undefined") {
+      if (typeof args.socketAction.closeSocket !== "undefined") {
+        // console.log("SOCKETACTION5:", args.socketAction.closeSocket);
+
+        closeSession(args.socketAction.closeSocket);
+      }
+    }
   }
 };
 
 const onExternalResult = (res, cartid) => {
   //
+};
+
+/**
+ * Closes a session
+ * @param {string} room
+ */
+const closeSession = (session) => {
+  io.of("/")
+    .in(session)
+    .clients((error, socketIds) => {
+      if (error) throw error;
+
+      socketIds.forEach((socketId) =>
+        io.sockets.sockets[socketId].leave(session)
+      );
+    });
 };
 
 app.post("/ip", function (req, res) {
@@ -50,13 +82,6 @@ app.post("/ip", function (req, res) {
 });
 
 app.post("/auth", function (req, res) {
-  // res.sendFile(path.join(__dirname, "/_client/index.html"), function (err) {
-  //   if (err) {
-  //     res.status(500).send(err);
-  //   }
-  // });
-  // const business =
-  //   typeof req.body.business !== "undefined" ? req.body.business : 0;
   const cartid = uuidv4();
   const merchant =
     typeof req.body.merchant !== "undefined" ? req.body.merchant : "";
@@ -122,8 +147,6 @@ app.get("*", function (req, res) {
 //     }
 //   });
 // });
-
-const allClients = [];
 
 // Handle client connection
 io.on("connection", (socket) => {

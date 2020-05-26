@@ -50,8 +50,6 @@ const prod = {
   },
 };
 
-// const hostname = window && window.location && window.location.hostname;
-
 let config;
 switch (SITE_MODE) {
   case "DEVELOPMENT":

@@ -39,3 +39,8 @@ start slave
 -- For replication arrangement A -> B -> C:
 -- In /etc/my.cnf.d/server.cnf:
 -- log_slave_updates=ON
+
+-----------------------------------------
+
+STOP SLAVE
+RESET SLAVE ALL

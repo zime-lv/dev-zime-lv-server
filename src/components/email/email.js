@@ -15,13 +15,13 @@ async function main(args) {
 
   // create reusable transporter object using the default SMTP transport
   let transporter = nodemailer.createTransport({
-    host: "strazds.com", // "zime.lv", // "smtp.ethereal.email",
+    host: "zime.lv", // "strazds.com" // "zime.lv", // "smtp.ethereal.email",
     port: 465, // 587,
     // port: 443,
     // rejectUnauthorized: false,
     secure: true, // true for 465, false for other ports
     auth: {
-      user: "service@strazds.com", //  testAccount.user, // generated ethereal user
+      user: "service@zime.lv", // service@strazds.com // testAccount.user, // generated ethereal user
       pass: "hajgfd_36754_JSZDM", // testAccount.pass, // generated ethereal password
     },
   });

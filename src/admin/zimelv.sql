@@ -13,6 +13,29 @@ INSERT INTO vault (acc, created, reviser, workplace)
 VALUES (100000000000, UTC_TIMESTAMP(), 'SYS', 'SYSTEM');
 
 --
+-- URI settings
+--
+CREATE TABLE IF NOT EXISTS uri_settings (
+    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
+    `uri` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "the URI",
+    `settings` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "URI settings (JSON string)",
+    `status` int(1) NOT NULL DEFAULT 0  COMMENT "URI settings status",
+    `created` datetime NULL  COMMENT "creation date and time",
+    `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
+    `workplace` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "workplace",
+    `ts` timestamp NOT NULL  COMMENT "timestamp",
+    PRIMARY KEY (`id`),
+    UNIQUE KEY unique_uri (`uri`),
+    INDEX `index_uri` (`uri`) USING BTREE
+) ENGINE = InnoDB COMMENT = 'uri_settings';
+
+INSERT INTO uri_settings (uri, settings, created, reviser, workplace)
+VALUES 
+("localhost", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM'),
+("dev.zime.lv", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM'),
+("zime.lv", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM');
+
+--
 -- Currencies
 --
 CREATE TABLE IF NOT EXISTS currencies (
@@ -72,6 +95,22 @@ CREATE TABLE IF NOT EXISTS users (
     UNIQUE KEY unique_email (`email`),
     INDEX `index_uid` (`uid`) USING BTREE
 ) ENGINE = InnoDB COMMENT = 'users';
+
+--
+-- Sessions
+--
+CREATE TABLE IF NOT EXISTS sessions (
+    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
+    `email` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "email",
+    `token` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "token",
+    `iv` varchar(64) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "iv",
+    `status` int(1) NOT NULL DEFAULT 0  COMMENT "status",
+    `created` datetime NULL COMMENT "creation date and time",
+    PRIMARY KEY (`id`),
+    UNIQUE KEY unique_email (`email`),
+    INDEX `index_token` (`token`) USING BTREE,
+    FOREIGN KEY(`email`) REFERENCES users(`email`) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE = InnoDB COMMENT = 'sessions';
 
 --
 -- Pools

@@ -44,9 +44,28 @@ Ways to update geoip-lite data:
 
 =======================================================================
 
-- Plesk / Apache & Nginx settings -> uncheck Proxy mode 
-- Plesk / Node / Custom environment variables -> SITE_MODE: STAGING | LIVE
+Set up server:
+- Plesk -> Tools & Settings -> Updates -> Web Hosting -> Install: Nginx server
+- Plesk -> Tools & Settings -> Services Management -> Start: Reverse Proxy Server (nginx)
+- Plesk -> Apache & Nginx settings -> uncheck Proxy mode 
+- Plesk -> Node / Custom environment variables -> SITE_MODE: STAGING | LIVE
+- Copy .env, package-lock.json, package.json
 - Copy server files WITH node_modules, THEN install on Plesk
+
+=======================================================================
+
+Contact name: ZIME Service
+Email address: service@zime.lv
+External email address: strazds@gmail.com
+User role: Administrator (? necessary ?)
+Access to subscriptions: All (? necessary ?)
+Username: service@zime.lv
+Password: hajgfd_36754_JSZDM
+User is active: check
+
+=======================================================================
+
+Secure e-mail with Let's Encrypt 
 
 =======================================================================
 
