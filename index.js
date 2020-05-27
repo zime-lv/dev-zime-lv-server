@@ -113,11 +113,12 @@ app.post("/auth", function (req, res) {
 
 // app.get("/*", function (req, res) {
 
-app.get("/summary", function (req, res) {
-  // const filePath = "./_client/index.html";
-  const filePath = "./_client/index.html";
+app.get("/", function (req, res) {
+  // need access to IP address here
+  // res.send("<h1>ZIME LV</h1>");
+  const filePath = "public/index.html";
   const resolvedPath = path.resolve(filePath);
-  console.log("resolvedPath:", resolvedPath);
+  // console.log("resolvedPath:", resolvedPath);
   // res.sendFile(path.join(__dirname, "/_client/index.html"), function (err) {
   res.sendFile(resolvedPath, function (err) {
     if (err) {
@@ -125,6 +126,19 @@ app.get("/summary", function (req, res) {
     }
   });
 });
+
+// app.get("/summary", function (req, res) {
+//   // const filePath = "./_client/index.html";
+//   const filePath = "./_client/index.html";
+//   const resolvedPath = path.resolve(filePath);
+//   console.log("resolvedPath:", resolvedPath);
+//   // res.sendFile(path.join(__dirname, "/_client/index.html"), function (err) {
+//   res.sendFile(resolvedPath, function (err) {
+//     if (err) {
+//       res.status(500).send(err);
+//     }
+//   });
+// });
 
 // app.get("/*", function (req, res) {
 app.get("*", function (req, res) {
