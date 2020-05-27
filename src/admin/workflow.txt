@@ -114,18 +114,18 @@ git push origin develop
 
 Creating a release branch:
 -------------------------------------
-git checkout -b release-1.0.3 develop
-### ./bump-version.sh 1.0.0
-$ git commit -a -m "Bumped version number to 1.0.3"
+git checkout -b release-0.0.6 develop
+(do the work)
+git commit -a -m "Bumped version number to 0.0.6"
 
 Finishing a release branch:
 -------------------------------------
 git checkout master
-git merge --no-ff release-1.0.3
-git tag -a 1.0.3 -m "Released v1.0.3 for dev.zime.lv"
+git merge --no-ff release-0.0.6
+git tag -a 0.0.6 -m "Released v0.0.6 for dev.zime.lv"
 git checkout develop
-git merge --no-ff release-1.0.3
-git branch -d release-1.0.3
+git merge --no-ff release-0.0.6
+git branch -d release-0.0.6
 
 Creating the hotfix branch:
 -------------------------------------
