@@ -1,7 +1,7 @@
 {
   "name": "dev-zime-lv-server",
   "homepage": ".",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "ZIME LV Development Server",
   "private": true,
   "dependencies": {

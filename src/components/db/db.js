@@ -7,9 +7,42 @@ const ucode = require("../../utils/ucode");
 const hash = require("object-hash");
 const salt = "_hjs_722m_GHAE_";
 
-// const setSocket = ({ io, session, uid, req }) => {
-//   db.setSocket({ io, session, uid, req });
-// };
+/**
+ * Validate session
+ * @param {string} session
+ */
+const validateSession = ({ session }) => {
+  let name = [];
+  let sql = [];
+  let values = [];
+  name[0] = "VALIDATE SESSION";
+  sql[0] = `
+    SELECT COALESCE(email, "") AS email
+    , COALESCE(token, "") AS token
+    , COALESCE(iv, "") AS iv
+    FROM sessions
+    WHERE token = ?
+  `;
+  values[0] = [session];
+  return { name, sql, values, index: 0 };
+};
+
+/**
+ * Push queries
+ * @param {object} queries
+ * @param {integer} index
+ */
+const pushQueries = (queries, name, sql, values, index) => {
+  for (let n = 1; n <= index; n++) {
+    queries.push({
+      // query
+      name: name[n],
+      sql: sql[n],
+      values: values[n],
+    });
+  }
+  return queries;
+};
 
 /**
  * Add or update user
@@ -160,9 +193,11 @@ const mergeUser = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
+
+  let { name, sql, values, index } = validateSession({ session });
 
   // generate uid here
   if (uid === null && scode !== null && tcode !== null && sequence !== null) {
@@ -181,8 +216,9 @@ const mergeUser = ({
     }
   }
 
-  name[0] = "INSERT INTO users";
-  sql[0] = `
+  index++;
+  name[index] = "INSERT INTO users";
+  sql[index] = `
     INSERT INTO users (firstname, lastname, email, pw, acc_curr, acc_cred, acc_save, allowance_date, language, status, created, reviser, workplace)
     VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, 0, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE 
@@ -203,8 +239,7 @@ const mergeUser = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
     `;
-
-  values[0] = [
+  values[index] = [
     /* Insert values */
     // uid,
     firstname,
@@ -246,8 +281,9 @@ const mergeUser = ({
   let token = null;
   if (validateEmail) {
     token = crypto.randomBytes(64).toString("base64");
-    name[1] = "INSERT INTO validation_tokens";
-    sql[1] = `
+    index++;
+    name[index] = "INSERT INTO validation_tokens";
+    sql[index] = `
     INSERT INTO validation_tokens (type, email, token, expiration, status, created, reviser, workplace)
     VALUES ('email', ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 HOUR), ?, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE
@@ -255,7 +291,7 @@ const mergeUser = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
     `;
-    values[1] = [
+    values[index] = [
       /* Insert values */
       email,
       token,
@@ -290,16 +326,7 @@ const mergeUser = ({
     },
   ];
 
-  if (validateEmail) {
-    queries.push({
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    });
-  }
-
-  // console.log("mergeIntoDb: ", queries);
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -472,52 +499,52 @@ const uploadFile = ({
  * Init user (for log in)
  * @param {*} param0
  */
-const initUser = ({
-  // system
-  req = null,
-  reqData = null,
-  session = null,
-  onStatusChange = () => {},
-  onError = () => {},
+// const initUser = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
 
-  // user
-  email = null,
-}) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+//   // user
+//   email = null,
+// }) => {
+//   let name = [];
+//   let sql = [];
+//   let values = [];
 
-  let n = -1;
+//   let n = -1;
 
-  if (true) {
-    n++;
-    name[n] = "UPDATE last seen user";
-    sql[n] = `
-    UPDATE users
-    SET last_seen = UTC_TIMESTAMP()
-    WHERE email = ?
-    `;
-    values[n] = [email];
-  }
+//   if (true) {
+//     n++;
+//     name[n] = "UPDATE last seen user";
+//     sql[n] = `
+//     UPDATE users
+//     SET last_seen = UTC_TIMESTAMP()
+//     WHERE email = ?
+//     `;
+//     values[n] = [email];
+//   }
 
-  let queries = [
-    {
-      // system
-      req: req,
-      reqData: reqData,
-      session: session,
-      onStatusChange: onStatusChange,
-      onError: onError,
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
 
-      // query
-      name: name[0],
-      sql: sql[0],
-      values: values[0],
-    },
-  ];
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
 
-  return db.mergeIntoDb(queries);
-};
+//   return db.mergeIntoDb(queries);
+// };
 
 /**
  * Get URI settings
@@ -597,24 +624,13 @@ const signInUser = ({
   n++;
   name[n] = "SELECT users";
   sql[n] = `
-    SELECT u.uid, u.firstname, u.lastname, u.email, u.sequence, u.acc_curr, u.acc_cred, u.acc_save, u.website, u.phone, u.last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) seconds_since_last_seen, u.language, u.status, u.ts,
+    SELECT u.uid, u.firstname, u.lastname, u.email, u.sequence, u.acc_curr, u.acc_cred, u.acc_save, u.website, u.phone, u.language, u.status, u.ts,
     c.name AS currency_name, c.abbr AS currency_abbr, c.rate AS currency_rate, c.status AS currency_status
     FROM users AS u
     INNER JOIN currencies AS c ON c.abbr = u.currency_id
     WHERE u.email = ? AND u.pw = ?
     `; // suspended account status = 2
   values[n] = [email, hash(`${salt}${pw}`)];
-
-  // n++;
-  // name[n] = "SELECT users";
-  // sql[n] = `
-  //   SELECT u.uid, u.firstname, u.lastname, u.language, u.status,
-  //   c.name AS currency_name, c.abbr AS currency_abbr, c.rate AS currency_rate, c.status AS currency_status
-  //   FROM users AS u
-  //   INNER JOIN currencies AS c ON c.abbr = u.currency_id
-  //   WHERE u.email = ? AND u.pw = ?
-  //   `; // suspended account status = 2
-  // values[n] = [email, hash(`${salt}${pw}`)];
 
   n++;
   name[n] = "INSERT INTO user_connection";
@@ -638,12 +654,12 @@ const signInUser = ({
     ipGeo === null ? null : ipGeo.country,
     ipGeo === null ? null : ipGeo.region,
     ipGeo === null ? null : ipGeo.eu,
-    ipGeo === null ? null : ipGeo.timezone,
-    ipGeo === null ? null : ipGeo.city,
+    ipGeo === null ? "-" : ipGeo.timezone,
+    ipGeo === null ? "-" : ipGeo.city,
     ipGeo === null ? null : ipGeo.gps_lat,
     ipGeo === null ? null : ipGeo.gps_lon,
     ipGeo === null ? null : ipGeo.metro,
-    ipGeo === null ? null : ipGeo.area,
+    ipGeo === null ? "-" : ipGeo.area,
   ];
 
   let queries = [
@@ -669,12 +685,6 @@ const signInUser = ({
       sql: sql[1],
       values: values[1],
     },
-    // {
-    //   // query
-    //   name: name[2],
-    //   sql: sql[2],
-    //   values: values[2],
-    // },
   ];
 
   return db.mergeIntoDb(queries);
@@ -684,51 +694,51 @@ const signInUser = ({
  * Last seen user
  * @param {*} param0
  */
-const lastSeenUser = ({
-  // system
-  req = null,
-  reqData = null,
-  session = null,
-  onStatusChange = () => {},
-  onError = () => {},
+// const lastSeenUser = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
 
-  // user
-  email = null,
-}) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+//   // user
+//   email = null,
+// }) => {
+//   let name = [];
+//   let sql = [];
+//   let values = [];
 
-  name[0] = "UPDATE users";
-  sql[0] = `
-    UPDATE users
-    SET last_seen = UTC_TIMESTAMP()
-    WHERE email = ?
-    `; // suspended account status = 2
-  values[0] = [email];
+//   name[0] = "UPDATE users";
+//   sql[0] = `
+//     UPDATE users
+//     SET last_seen = UTC_TIMESTAMP()
+//     WHERE email = ?
+//     `; // suspended account status = 2
+//   values[0] = [email];
 
-  let queries = [
-    {
-      // system
-      req: req,
-      reqData: reqData,
-      session: session,
-      // onStatusChange: () => {}, // onStatusChange,
-      onStatusChange: onStatusChange,
-      onError: onError,
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       // onStatusChange: () => {}, // onStatusChange,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
 
-      // tags
-      tags: { email: email },
+//       // tags
+//       tags: { email: email },
 
-      // query
-      name: name[0],
-      sql: sql[0],
-      values: values[0],
-    },
-  ];
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
 
-  return db.mergeIntoDb(queries);
-};
+//   return db.mergeIntoDb(queries);
+// };
 
 /**
  * Get account (for log in)
@@ -744,32 +754,20 @@ const getAccount = ({
 
   // user
   uid = null,
-  timeout = 5 * 60, // seconds
-  checkTimeout = true,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  let { name, sql, values, index } = validateSession({ session });
 
-  // name[0] = "SELECT users";
-  // sql[0] = `
-  //   SELECT uid, firstname, lastname, email, sequence, acc_curr, acc_cred, acc_save, website, phone, last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) seconds_since_last_seen, status, ts
-  //   FROM users
-  //   WHERE uid = ?
-  //   AND (? OR TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), last_seen)) <= ?)
-  //   `; // suspended account status = 2
-  // values[0] = [uid, checkTimeout, timeout];
-
-  name[0] = "SELECT users";
-  sql[0] = `
-    SELECT u.uid, u.firstname, u.lastname, u.email, u.sequence, u.acc_curr, u.acc_cred, u.acc_save, u.website, u.phone, u.last_seen, TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), u.last_seen)) AS seconds_since_last_seen, u.status, u.ts 
+  index++;
+  name[index] = "SELECT users";
+  sql[index] = `
+    SELECT u.uid, u.firstname, u.lastname, u.email, u.sequence, u.acc_curr, u.acc_cred, u.acc_save, u.website, u.phone, u.status, u.ts 
     , s.token, s.iv
     FROM users AS u
-    INNER JOIN sessions AS s ON s.email = u.email
+    INNER JOIN sessions AS s ON s.email = u.email 
     WHERE u.uid = ?
-    AND (? OR TIME_TO_SEC(TIMEDIFF(UTC_TIMESTAMP(), u.last_seen)) <= ?)
+    AND s.token = ?
     `; // suspended account status = 2
-  values[0] = [uid, checkTimeout, timeout];
+  values[index] = [uid, session];
 
   let queries = [
     {
@@ -786,6 +784,8 @@ const getAccount = ({
       values: values[0],
     },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
@@ -809,12 +809,11 @@ const getTransactions = ({
   page = 0,
   limit = 5,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  let { name, sql, values, index } = validateSession({ session });
 
-  name[0] = "SELECT transactions";
-  sql[0] = `
+  index++;
+  name[index] = "SELECT transactions";
+  sql[index] = `
   SELECT *
   FROM (
     SELECT 'sender' AS tid, (tp.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, tp.recipient_id, tp.roles, tp.share, tp.share_per_cent, 
@@ -852,22 +851,11 @@ const getTransactions = ({
   ORDER BY created DESC, conv_amount
   LIMIT ? OFFSET ?
     `;
-  values[0] = [uid, uid, limit, page * limit];
+  values[index] = [uid, uid, limit, page * limit];
 
-  // UNION ALL
-
-  // SELECT 'allowance' AS tid, (ua.allowance * ua.payments) as conv_amount, '-' AS from_account, 'acc_curr' AS to_account, ua.uid AS recipient_id, '-' AS roles, '-' AS share, '-' AS share_per_cent,
-  // '-' AS sender_firstname, '-' AS sender_lastname, '-' AS sender_status,
-  // ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
-  // '-' AS business_id, '-' AS business_title, '-' AS business_description, '-' AS business_link, '-' AS business_image, '-' AS business_status,
-  // '-' AS purpose_title, '-' AS purpose_description, '-' AS purpose_link, '-' AS purpose_image, '-' AS purpose_status,
-  // 'allowance' AS type, 'Z' AS currency, '1' AS exchange_rate, '-' AS sender_id, '-' AS purpose_id, '-' AS comment, DATE_FORMAT(ua.date, '%Y-%m-%d %H:%i:%s') AS created
-  // FROM user_allowance AS ua
-  // LEFT JOIN users AS ur ON ur.uid = ua.uid
-  // WHERE ua.uid = ?
-
-  name[1] = "COUNT transactions";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT transactions";
+  sql[index] = `
     SELECT
     (
       SELECT COUNT(*)
@@ -882,7 +870,7 @@ const getTransactions = ({
     )
     AS count_transaction_positions
   `;
-  values[1] = [uid, uid];
+  values[index] = [uid, uid];
 
   let queries = [
     {
@@ -898,13 +886,9 @@ const getTransactions = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -927,12 +911,11 @@ const getShares = ({
   page = 0,
   limit = 5,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  let { name, sql, values, index } = validateSession({ session });
 
-  name[0] = "SELECT shares";
-  sql[0] = `
+  index++;
+  name[index] = "SELECT shares";
+  sql[index] = `
     SELECT s.shareholder_id, s.purpose_id, s.title AS shares_title, s.description AS shares_description, s.roles AS shares_roles, s.share AS shares_share, s.status AS shares_status, DATE_FORMAT(s.created, '%Y-%m-%d %H:%i:%s') as shares_created,
     pp.title AS purpose_title, pp.description AS purpose_description, pp.link AS purpose_link, pp.image AS purpose_image, p.status AS purpose_status,
     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
@@ -956,15 +939,16 @@ const getShares = ({
     ORDER BY shares_created DESC, shares_title
     LIMIT ? OFFSET ?
     `;
-  values[0] = [uid, 2, language, limit, page * limit];
+  values[index] = [uid, 2, language, limit, page * limit];
 
-  name[1] = "COUNT shares";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT shares";
+  sql[index] = `
     SELECT COUNT(*) as count_shares
     FROM shares
     WHERE shareholder_id = ?
   `;
-  values[1] = [uid];
+  values[index] = [uid];
 
   let queries = [
     {
@@ -980,13 +964,60 @@ const getShares = ({
       sql: sql[0],
       values: values[0],
     },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+const endSession = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  token = null,
+}) => {
+  let name = [];
+  let sql = [];
+  let values = [];
+
+  name[0] = "UPDATE sessions";
+  sql[0] = `
+    UPDATE sessions
+    SET token = ''
+    , iv = ''
+    WHERE token = ?
+  `;
+  values[0] = [
+    /* Update values */
+    token,
+  ];
+
+  let queries = [
     {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // user
+      // email: null,
+
       // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
     },
   ];
+
+  // console.log("mergeIntoDb: ", queries);
 
   return db.mergeIntoDb(queries);
 };
@@ -1072,12 +1103,15 @@ const mergeBusiness = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "INSERT INTO businesses";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "INSERT INTO businesses";
+  sql[index] = `
     INSERT INTO businesses (title, description, owner_id, status, created, reviser, workplace)
     VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE 
@@ -1086,7 +1120,7 @@ const mergeBusiness = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
   `;
-  values[0] = [
+  values[index] = [
     /* Insert values */
     title,
     description,
@@ -1121,7 +1155,7 @@ const mergeBusiness = ({
     },
   ];
 
-  // console.log("mergeIntoDb: ", queries);
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1146,12 +1180,15 @@ const mergeCurrency = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "INSERT INTO currencies";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "INSERT INTO currencies";
+  sql[index] = `
     INSERT INTO currencies (name, abbr, rate, region, status, created, reviser, workplace)
     VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE 
@@ -1163,7 +1200,7 @@ const mergeCurrency = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
   `;
-  values[0] = [
+  values[index] = [
     /* Insert values */
     curr_title,
     abbr,
@@ -1202,6 +1239,8 @@ const mergeCurrency = ({
     },
   ];
 
+  queries = pushQueries(queries, name, sql, values, index);
+
   return db.mergeIntoDb(queries);
 };
 
@@ -1221,12 +1260,15 @@ const getCurrencies = ({
   page = 0,
   limit = 5,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "SELECT currencies";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT currencies";
+  sql[index] = `
     SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created, COUNT(cs.abbr) AS sponsors
     FROM currencies AS c
     LEFT JOIN currency_sponsors AS cs ON cs.abbr = c.abbr
@@ -1235,13 +1277,14 @@ const getCurrencies = ({
     ORDER BY sponsors DESC, c.abbr
     LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[0] = [limit, page * limit];
+  values[index] = [limit, page * limit];
 
-  name[1] = "COUNT currencies";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT currencies";
+  sql[index] = `
     SELECT COUNT(*) count_currencies FROM currencies;
   `;
-  values[1] = [];
+  values[index] = [];
 
   let queries = [
     {
@@ -1257,13 +1300,9 @@ const getCurrencies = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1331,17 +1370,20 @@ const mergeUserCurrency = ({
   email = null,
   currency_id = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "UPDATE users";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "UPDATE users";
+  sql[index] = `
     UPDATE users 
     SET currency_id = ?
     WHERE email = ?
     `; // suspended account status = 2
-  values[0] = [currency_id, email];
+  values[index] = [currency_id, email];
 
   let queries = [
     {
@@ -1358,6 +1400,8 @@ const mergeUserCurrency = ({
       values: values[0],
     },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1564,26 +1608,30 @@ const getBusiness = ({
   page = 0,
   limit = 1,
 }) => {
-  let name = []; // query name
-  let sql = [];
-  let values = [];
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "SELECT businesses";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT businesses";
+  sql[index] = `
     SELECT business_id, title, description, link, image, status, DATE_FORMAT(created, '%Y-%m-%d %H:%i:%s') as created
     FROM businesses 
     WHERE owner_id = ? AND status < 2
     LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[0] = [uid, limit, page * limit];
+  values[index] = [uid, limit, page * limit];
 
-  name[1] = "COUNT businesses";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT businesses";
+  sql[index] = `
     SELECT COUNT(*) as count_businesses
     FROM businesses
     WHERE owner_id = ?
   `;
-  values[1] = [uid];
+  values[index] = [uid];
 
   let queries = [
     {
@@ -1599,14 +1647,9 @@ const getBusiness = ({
       sql: sql[0],
       values: values[0],
     },
-
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1857,12 +1900,15 @@ const getShare = ({
   // user
   purpose_id = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "SELECT shares";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT shares";
+  sql[index] = `
     SELECT s.purpose_id, s.shareholder_id, u.firstname, u.lastname, u.email, s.title, s.description, s.roles, s.share, s.status, DATE_FORMAT(s.created, '%Y-%m-%d %H:%i:%s') as created
     FROM shares as s
     INNER JOIN users as u ON u.uid = s.shareholder_id
@@ -1870,7 +1916,7 @@ const getShare = ({
     AND s.status < 2
     AND u.status < 2
     `; // suspended account status = 2
-  values[0] = [purpose_id];
+  values[index] = [purpose_id];
 
   let queries = [
     {
@@ -1887,6 +1933,8 @@ const getShare = ({
       values: values[0],
     },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
@@ -2096,26 +2144,8 @@ const getTransactionById = ({
     },
   ];
 
-  // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
 };
-
-// const emitCurrency = ({ allowance }) => {
-//   let sql = `
-//     CREATE EVENT hourlyAllowance
-//     ON SCHEDULE EVERY 1 HOUR
-//     STARTS CURRENT_TIMESTAMP
-//     DO
-//       UPDATE users
-//       SET acc_curr = acc_curr + ?
-//       WHERE status = 0`;
-
-//   let values = [allowance];
-
-//   let queries = [{ sql: sql, values: values }];
-
-//   return db.mergeIntoDb(queries, dbTypes.dbMergeFlags.ALLOW_UNCHANGED_ROWS);
-// };
 
 const transferU2S = ({
   // system
@@ -2144,12 +2174,15 @@ const transferU2S = ({
     });
     return;
   }
-  let name = []; // query name
-  let sql = [];
-  let values = [];
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "UPDATE users";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "UPDATE users";
+  sql[index] = `
     UPDATE users
     SET ${fromAccount} = ${fromAccount} - ?,
     ${toAccount} = ${toAccount} + ?,
@@ -2158,19 +2191,21 @@ const transferU2S = ({
     WHERE uid = ?
     AND ${fromAccount} - ? >= 0
     `;
-  values[0] = [amount, amount, reviser, workplace, sender_id, amount];
+  values[index] = [amount, amount, reviser, workplace, sender_id, amount];
 
-  name[1] = "INSERT INTO transactions";
-  sql[1] = `
+  index++;
+  name[index] = "INSERT INTO transactions";
+  sql[index] = `
   INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, created, reviser, workplace)
   VALUES (?, ?, 'Z', 1.0, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
-  values[1] = [req, amount, sender_id];
+  values[index] = [req, amount, sender_id];
 
-  name[2] = "INSERT INTO transaction_positions";
-  sql[2] = `
+  index++;
+  name[index] = "INSERT INTO transaction_positions";
+  sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, from_account, to_account, created, reviser, workplace)
   VALUES ('[INSERT_ID]', ?, ?, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
-  values[2] = [amount, sender_id, fromAccount, toAccount];
+  values[index] = [amount, sender_id, fromAccount, toAccount];
 
   let queries = [
     {
@@ -2189,19 +2224,9 @@ const transferU2S = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
-    {
-      // query
-      name: name[2],
-      sql: sql[2],
-      values: values[2],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -2497,12 +2522,15 @@ const transferU2U = ({
     });
     return;
   }
-  let name = []; // query name
-  let sql = [];
-  let values = [];
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "UPDATE sender";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "UPDATE sender";
+  sql[index] = `
     UPDATE users
     SET ${fromAccount} = ${fromAccount} - ?,
     reviser = ?,
@@ -2510,29 +2538,39 @@ const transferU2U = ({
     WHERE uid = ?
     AND ${fromAccount} - ? >= 0
     `;
-  values[0] = [amount, reviser, workplace, sender_id, amount];
+  values[index] = [amount, reviser, workplace, sender_id, amount];
 
-  name[1] = "UPDATE recipient";
-  sql[1] = `
+  /**
+   * Initialy user accounts are limited to Z 2000;
+   * Every day this limit is increased by Z 48
+   * until a total limit of Z 24,000 is reached.
+   */
+  index++;
+  name[index] = "UPDATE recipient";
+  sql[index] = `
   UPDATE users
   SET ${toAccount} = ${toAccount} + ?,
   reviser = ?,
   workplace = ?
   WHERE uid = ?
+  AND acc_curr + acc_cred + acc_save + ? <= 2000 + DATEDIFF(UTC_TIMESTAMP(), created) * 48
+  AND acc_curr + acc_cred + acc_save + ? <= 24000
   `;
-  values[1] = [amount, reviser, workplace, recipient_id];
+  values[index] = [amount, reviser, workplace, recipient_id, amount, amount];
 
-  name[2] = "INSERT INTO transactions";
-  sql[2] = `
+  index++;
+  name[index] = "INSERT INTO transactions";
+  sql[index] = `
   INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, comment, created, reviser, workplace)
   VALUES (?, ?, 'Z', 1.0, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
-  values[2] = [req, amount, sender_id, description];
+  values[index] = [req, amount, sender_id, description];
 
-  name[3] = "INSERT INTO transaction_positions";
-  sql[3] = `
+  index++;
+  name[index] = "INSERT INTO transaction_positions";
+  sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, from_account, to_account, created, reviser, workplace)
   VALUES ('[INSERT_ID]', ?, ?, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
-  values[3] = [amount, recipient_id, fromAccount, toAccount];
+  values[index] = [amount, recipient_id, fromAccount, toAccount];
 
   let queries = [
     {
@@ -2551,25 +2589,9 @@ const transferU2U = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
-    {
-      // query
-      name: name[2],
-      sql: sql[2],
-      values: values[2],
-    },
-    {
-      // query
-      name: name[3],
-      sql: sql[3],
-      values: values[3],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -2605,22 +2627,26 @@ const transferU2B = ({
     return;
   }
 
-  let name = []; // query name
-  let sql = [];
-  let values = [];
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "UPDATE sender";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "UPDATE sender";
+  sql[index] = `
     UPDATE users
     SET ${fromAccount} = ${fromAccount} - ?,
     reviser = ?,
     workplace = ?
     WHERE uid = ?
     `;
-  values[0] = [amount, reviser, workplace, sender_id];
+  values[index] = [amount, reviser, workplace, sender_id];
 
-  name[1] = "UPDATE shareholders";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE shareholders";
+  sql[index] = `
   UPDATE users AS u
   LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
@@ -2634,13 +2660,14 @@ const transferU2B = ({
   u.workplace = ?
   WHERE p.purpose_id = ?
   `;
-  values[1] = [amount, reviser, workplace, purpose_id];
+  values[index] = [amount, reviser, workplace, purpose_id];
 
-  name[2] = "INSERT INTO transactions";
-  sql[2] = `
+  index++;
+  name[index] = "INSERT INTO transactions";
+  sql[index] = `
   INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, purpose_id, comment, created, reviser, workplace)
   VALUES (?, ?, ?, (SELECT rate FROM currencies WHERE abbr = ?), ?, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
-  values[2] = [
+  values[index] = [
     req,
     amount,
     currency,
@@ -2650,8 +2677,9 @@ const transferU2B = ({
     description,
   ];
 
-  name[3] = "INSERT INTO transaction_positions";
-  sql[3] = `
+  index++;
+  name[index] = "INSERT INTO transaction_positions";
+  sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
   SELECT '[INSERT_ID]', 
   (
@@ -2677,7 +2705,7 @@ const transferU2B = ({
   LEFT JOIN users AS u ON u.uid = s1.shareholder_id
   WHERE s1.purpose_id = ?
   `;
-  values[3] = [amount, purpose_id];
+  values[index] = [amount, purpose_id];
 
   const queries = [
     {
@@ -2696,25 +2724,9 @@ const transferU2B = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
-    {
-      // query
-      name: name[2],
-      sql: sql[2],
-      values: values[2],
-    },
-    {
-      // query
-      name: name[3],
-      sql: sql[3],
-      values: values[3],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -2753,22 +2765,26 @@ const transferV2U = ({
     return;
   }
 
-  let name = []; // query name
-  let sql = [];
-  let values = [];
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "UPDATE vault";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "UPDATE vault";
+  sql[index] = `
     UPDATE vault
     SET acc = acc - ?,
     reviser = ?,
     workplace = ?
     AND acc - ? >= 0
     `;
-  values[0] = [amount, reviser, workplace, amount];
+  values[index] = [amount, reviser, workplace, amount];
 
-  name[1] = "UPDATE recipient";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE recipient";
+  sql[index] = `
   UPDATE users AS u
   INNER JOIN sessions AS s ON s.email = u.email 
   AND s.token = ?
@@ -2779,19 +2795,21 @@ const transferV2U = ({
   WHERE u.uid = ?
   AND (u.allowance_date < DATE(UTC_TIMESTAMP()) OR u.allowance_date IS null)
   `;
-  values[1] = [session, amount, reviser, workplace, recipient_id];
+  values[index] = [session, amount, reviser, workplace, recipient_id];
 
-  name[2] = "INSERT INTO transactions";
-  sql[2] = `
+  index++;
+  name[index] = "INSERT INTO transactions";
+  sql[index] = `
   INSERT INTO transactions (type, amount, currency, exchange_rate, comment, created, reviser, workplace)
   VALUES (?, ?, 'Z', 1.0, ?, UTC_TIMESTAMP(), ?, ?)`;
-  values[2] = [req, amount, description, reviser, workplace];
+  values[index] = [req, amount, description, reviser, workplace];
 
-  name[3] = "INSERT INTO transaction_positions";
-  sql[3] = `
+  index++;
+  name[index] = "INSERT INTO transaction_positions";
+  sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, from_account, to_account, created, reviser, workplace)
   VALUES ('[INSERT_ID]', ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)`;
-  values[3] = [
+  values[index] = [
     amount,
     recipient_id,
     fromAccount,
@@ -2817,25 +2835,9 @@ const transferV2U = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
-    {
-      // query
-      name: name[2],
-      sql: sql[2],
-      values: values[2],
-    },
-    {
-      // query
-      name: name[3],
-      sql: sql[3],
-      values: values[3],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -3029,26 +3031,15 @@ const updatePurposeProps = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  // INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
-  // VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
-  // ON DUPLICATE KEY UPDATE
-  // title = COALESCE(?, title)
-  // , description = COALESCE(?, description)
-  // , link = COALESCE(?, link)
-  // , image = COALESCE(?, image)
-  // , status = COALESCE(?, status)
-  // , reviser = COALESCE(?, reviser)
-  // , workplace = COALESCE(?, workplace)
+  let { name, sql, values, index } = validateSession({ session });
 
-  // WHERE purpose_id = ?
-  // AND language = ?
-
-  name[0] = "MERGE purpose_props";
-  sql[0] = `
+  index++;
+  name[index] = "MERGE purpose_props";
+  sql[index] = `
   INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
   VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
   ON DUPLICATE KEY UPDATE
@@ -3060,8 +3051,7 @@ const updatePurposeProps = ({
   , reviser = COALESCE(?, reviser)
   , workplace = COALESCE(?, workplace)
   `;
-
-  values[0] = [
+  values[index] = [
     // insert vars
     purpose_id,
     language,
@@ -3103,6 +3093,8 @@ const updatePurposeProps = ({
     },
   ];
 
+  queries = pushQueries(queries, name, sql, values, index);
+
   return db.mergeIntoDb(queries);
 };
 
@@ -3127,17 +3119,19 @@ const addPurpose = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "INSERT INTO purposes";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "INSERT INTO purposes";
+  sql[index] = `
   INSERT INTO purposes (business_id, purpose_id, title, description, status, created, reviser, workplace)
   VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
   `;
-
-  values[0] = [
+  values[index] = [
     // insert vars
     business_id,
     purpose_id,
@@ -3148,12 +3142,13 @@ const addPurpose = ({
     workplace,
   ];
 
-  name[1] = "INSERT INTO purpose_props";
-  sql[1] = `
+  index++;
+  name[index] = "INSERT INTO purpose_props";
+  sql[index] = `
   INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
   VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(), ?, ?)
   `;
-  values[1] = [
+  values[index] = [
     /* Insert values */
     language,
     title,
@@ -3163,18 +3158,6 @@ const addPurpose = ({
     reviser,
     workplace,
   ];
-
-  // if (purpose_id === null) {
-  //   name[2] = "INSERT INTO shares";
-  //   sql[2] = `;
-  //   INSERT INTO shares (purpose_id, shareholder_id, share, status, created, reviser, workplace)
-  //   VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, 500, 0, UTC_TIMESTAMP(), "SYS", "SYSTEM")
-  // `;
-  //   values[2] = [
-  //     /* Insert values */
-  //     uid,
-  //   ];
-  // }
 
   let queries = [
     {
@@ -3194,22 +3177,9 @@ const addPurpose = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
 
-  // if (purpose_id === null) {
-  //   queries.push({
-  //     // query
-  //     name: name[1],
-  //     sql: sql[1],
-  //     values: values[1],
-  //   });
-  // }
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -3234,12 +3204,15 @@ const mergeShareholder = ({
   reviser = null,
   workplace = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "INSERT INTO shares";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "INSERT INTO shares";
+  sql[index] = `
   INSERT INTO shares (purpose_id, shareholder_id, title, description, roles, share, status, created, reviser, workplace)
   VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
   ON DUPLICATE KEY UPDATE 
@@ -3250,8 +3223,7 @@ const mergeShareholder = ({
   , status = COALESCE(?, status)
   , reviser = COALESCE(?, reviser)
   , workplace = COALESCE(?, workplace)`;
-
-  values[0] = [
+  values[index] = [
     // insert vars
     purpose_id,
     shareholder_id,
@@ -3284,6 +3256,63 @@ const mergeShareholder = ({
       // user
       email: null,
       uid: uid,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+const saveMessage = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  sender = null,
+  language = null,
+  subject = null,
+  message = null,
+  reviser = null,
+  workplace = null,
+}) => {
+  let name = [];
+  let sql = [];
+  let values = [];
+
+  name[0] = "INSERT INTO contact";
+  sql[0] = `
+  INSERT INTO contact (sender, subject, message, language, created, reviser, workplace )
+  VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
+  `;
+
+  values[0] = [
+    // insert vars
+    sender,
+    subject,
+    message,
+    language,
+    reviser,
+    workplace,
+  ];
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
 
       // query
       name: name[0],
@@ -3471,6 +3500,7 @@ module.exports = {
   // addCurrency: addCurrency,
   getSequence: getSequence,
   mergeUser: mergeUser,
+  endSession: endSession,
   mergeSession: mergeSession,
   mergeBusiness: mergeBusiness,
   mergeCurrency: mergeCurrency,
@@ -3484,10 +3514,10 @@ module.exports = {
   transferU2B: transferU2B,
   transferV2U: transferV2U,
   // transferP2B: transferP2B,
-  initUser: initUser,
+  // initUser: initUser,
   getUriSettings: getUriSettings,
   signInUser: signInUser,
-  lastSeenUser: lastSeenUser,
+  // lastSeenUser: lastSeenUser,
   resetPassword: resetPassword,
   getUser: getUser,
   uploadFile: uploadFile,
@@ -3509,6 +3539,7 @@ module.exports = {
   changePurposeStatus: changePurposeStatus,
   mergeShareholder: mergeShareholder,
   removeShareholder: removeShareholder,
+  saveMessage: saveMessage,
   // mergeShares: mergeShares,
   // mergePool: mergePool,
   // mergePoolUsers: mergePoolUsers,

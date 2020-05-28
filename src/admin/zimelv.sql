@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS users (
     `currency_id` varchar(5) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT 'Z' COMMENT "currency abbreviation fid",
     `language` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "language code",
     `access` int(4) NULL COMMENT "access rights",
-    `last_seen` datetime NULL COMMENT "user last activity date and time",
+
     `status` int(1) NOT NULL DEFAULT 0  COMMENT "status: 0 = not verified, 1 = verified, 2 = suspended, 3 = deleted",
     `created` datetime NULL  COMMENT "creation date and time",
     `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
@@ -207,6 +207,10 @@ CREATE TABLE IF NOT EXISTS purpose_props (
     `language` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "language code",
     `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose title",
     `description` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose description",
+    `category` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose category",
+    `subcategory` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose subcategory",
+    `subcategory2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose subcategory2",
+    `keywords` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose keywords",
     `link` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "link to the product webpage",
     `image` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "path to the product logo",
     `status` int(1) NOT NULL DEFAULT 0  COMMENT "status",
@@ -391,6 +395,26 @@ CREATE TABLE IF NOT EXISTS carts (
 ) ENGINE = InnoDB COMMENT = 'carts';
 
 --
+-- Contact
+--
+CREATE TABLE IF NOT EXISTS contact (
+    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
+    `sender` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "sender id",
+    `category` varchar(127) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT "feedback" COMMENT "contact category",
+    `subject` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "message subject",
+    `message` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "message body",
+    `language` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "language code",
+    `status` int(1) NOT NULL DEFAULT 0 COMMENT "cart status",
+    `created` datetime NULL  COMMENT "creation date and time",
+    `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
+    `workplace` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "workplace",
+    `ts` timestamp NOT NULL  COMMENT "timestamp",
+    PRIMARY KEY (`id`),
+    FOREIGN KEY(`sender`) REFERENCES users(`uid`),
+    INDEX `index_title` (`title`)
+) ENGINE = InnoDB COMMENT = 'contact';
+
+--
 -- User connection
 --
 CREATE TABLE IF NOT EXISTS user_connection (
@@ -452,3 +476,5 @@ SET NEW.purpose_id = CONCAT(
         ), 20, '0'
     )
 );
+
+
