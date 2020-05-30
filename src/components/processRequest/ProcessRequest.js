@@ -110,8 +110,8 @@ const userRequest = (args) => {
 
         // user
         uid: userData.uid,
-        timeout: userData.timeout,
-        checkTimeout: userData.checkTimeout,
+        // timeout: userData.timeout,
+        // checkTimeout: userData.checkTimeout,
       });
       break;
 
@@ -181,32 +181,6 @@ const userRequest = (args) => {
         uri: userData.uri,
       });
 
-      db.initUser({
-        // system
-        req: "init user",
-        session: data.session,
-        reqData: userData,
-        onStatusChange: onStatusChange,
-        onError: onRequestError,
-
-        // user
-        email: userData.email,
-      });
-
-      // TODO: Consider using promise here
-
-      // let settings = {
-      //   currencies: null,
-      //   // currency: null,
-      //   currencyCreationAllowed: true,
-      //   logo: "gfx/zlogo_light.png",
-      // };
-
-      // const settings = require("./settings.json");
-      // userData.settings = settings;
-
-      // get URI settings
-
       db.signInUser({
         // system
         req: data.req,
@@ -219,25 +193,6 @@ const userRequest = (args) => {
         email: userData.email,
         pw: userData.password,
         ip: userData.ip,
-      });
-      break;
-
-    /**
-     * Update last seen user
-     */
-    case "update last seen user":
-      // if (!validateSession(data.session, userData.email)) return;
-
-      db.lastSeenUser({
-        // system
-        req: data.req,
-        session: data.session,
-        reqData: userData,
-        onStatusChange: onStatusChange,
-        onError: onRequestError,
-
-        // user
-        email: userData.email,
       });
       break;
 
@@ -766,8 +721,6 @@ const userRequest = (args) => {
       break;
 
     case "register shareholder":
-      // console.log("REGISTER SHAREHOLDER", data);
-
       db.mergeShareholder({
         // system
         req: data.req,
@@ -817,6 +770,25 @@ const userRequest = (args) => {
         // user
         purpose_id: userData.purpose_id,
         shareholder_id: userData.shareholder_id,
+        reviser: userData.reviser,
+        workplace: userData.workplace,
+      });
+      break;
+
+    case "send message":
+      db.saveMessage({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+
+        // user
+        sender: userData.sender,
+        language: userData.language,
+        subject: userData.subject,
+        message: userData.message,
         reviser: userData.reviser,
         workplace: userData.workplace,
       });
@@ -953,6 +925,22 @@ const userRequest = (args) => {
         description: userData.description,
         reviser: userData.reviser,
         workplace: userData.workplace,
+      });
+      break;
+
+    case "end session":
+      const token = { token: "", iv: "" };
+
+      db.endSession({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+
+        // user
+        token: data.session,
       });
       break;
 

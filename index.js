@@ -44,7 +44,6 @@ const onProcessResult = (args) => {
     if (typeof args.socketAction !== "undefined") {
       if (typeof args.socketAction.closeSocket !== "undefined") {
         // console.log("SOCKETACTION5:", args.socketAction.closeSocket);
-
         closeSession(args.socketAction.closeSocket);
       }
     }
