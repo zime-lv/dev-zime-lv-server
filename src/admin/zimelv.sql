@@ -411,7 +411,7 @@ CREATE TABLE IF NOT EXISTS contact (
     `ts` timestamp NOT NULL  COMMENT "timestamp",
     PRIMARY KEY (`id`),
     FOREIGN KEY(`sender`) REFERENCES users(`uid`),
-    INDEX `index_title` (`title`)
+    INDEX `index_subject` (`subject`)
 ) ENGINE = InnoDB COMMENT = 'contact';
 
 --

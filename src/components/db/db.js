@@ -193,11 +193,12 @@ const mergeUser = ({
   reviser = null,
   workplace = null,
 }) => {
-  // let name = [];
-  // let sql = [];
-  // let values = [];
+  let name = [];
+  let sql = [];
+  let values = [];
 
-  let { name, sql, values, index } = validateSession({ session });
+  // let { name, sql, values, index } = validateSession({ session });
+  let index = -1;
 
   // generate uid here
   if (uid === null && scode !== null && tcode !== null && sequence !== null) {
