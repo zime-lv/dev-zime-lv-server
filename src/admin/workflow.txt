@@ -1,5 +1,8 @@
 =======================================================================
 
+Plesk directory:
+/var/www/vhosts/zime.lv/www/dev.zime.lv
+
 Plesk increase storage space by removing backups:
 - Use WinSCP (un: root)
 - In console:
@@ -17,6 +20,24 @@ df -h
 
 df -h /repair
 df -i /repair
+
+Create cron job for Cluster IP:
+root@h123456:~# ip addr add 85.215.83.34 dev eth0
+ifconfig
+wget ftp.stratoserver.net/pub/update/switch_cluster_ip
+chmod u+x switch_cluster_ip
+./switch_cluster_ip 85.215.83.34/fip7040928/mu2nYWV2 status
+./switch_cluster_ip 85.215.83.34/fip7040928/khsgsdh_863447_GUSDGU/85.215.83.36 status
+./switch_cluster_ip 85.215.83.34/fip7040928/khsgsdh_863447_GUSDGU/85.215.83.36 start
+./switch_cluster_ip 85.215.83.34/fip7040928/khsgsdh_863447_GUSDGU/85.214.146.139 status
+
+./switch_cluster_ip 85.215.83.34/root/mu2nYWV2/85.215.83.36 start
+./switch_cluster_ip
+
+<?php
+$perl_result = array();
+exec("perl $script_folder $project_folder", $perl_result);
+$perl_result = implode("\n", $perl_result);  # array --> string
 
 Strato: 030-300 146 0 (nur Geschäftszeiten)
 =======================================================================
