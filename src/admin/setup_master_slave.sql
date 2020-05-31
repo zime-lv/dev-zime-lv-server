@@ -1,3 +1,13 @@
+-- (0) MASTER / SLAVE(S)
+-- Adding database to existing replication:
+-- Make sure both tables are replicated:
+-- In /etc/my.cnf.d/server.cnf:
+--       -> replicate-do-db          = zimelv
+--       -> replicate-do-db          = dev_zimelv
+--       -> binlog-do-db            = zimelv
+--       -> binlog-do-db            = dev_zimelv
+-- In SSH -> Restart DB on MASTER / SLAVE(S): systemctl restart mariadb
+
 -- (1) MASTER
 -- Activate SSH access:
 -- Plesk -> Websites & Domains -> [Domain] -> Web hosting access -> Access to the server over SSH -> /usr/bin/bash
@@ -38,25 +48,28 @@
 flush tables with read lock
 show master status
 -- Write down (probably not necessary):
--- mysql-bin.000002
+-- mysql-bin.000008
 -- 245
--- dev_zimelv
+-- zimelv,dev_zimelv
 
 -- (9) MASTER
 -- On SSH:
--- mysqldump --user=u501809312753 --password=pmKdzo_732Hg5 dev_zimelv --master-data > dev_zimelv.sql
--- zip -r dev_zimelv.zip dev_zimelv.sql
+mysqldump --user=u501809312753 --password=pmKdzo_732Hg5 dev_zimelv --master-data > dev_zimelv.sql
+mysqldump --user=u501809312753 --password=pmKdzo_732Hg5 zimelv --master-data > zimelv.sql
+zip -r dev_zimelv.zip dev_zimelv.sql
+zip -r zimelv.zip zimelv.sql
 
 -- (10) MASTER
-FLUSH LOGS;
-SET GLOBAL binlog_format = 'MIXED';
+----- FLUSH LOGS;
+----- SET GLOBAL binlog_format = 'MIXED';
 FLUSH LOGS;
 UNLOCK TABLES;
 
 -- (11) MASTER / SLAVE
 -- On SSH:
 -- Copy the zip-file to the slave /-directory, then
--- unzip -d / dev_zimelv.zip
+unzip -d / dev_zimelv.zip
+unzip -d / zimelv.zip
 
 -- (12) MASTER / SLAVE
 -- On both master AND slave:
@@ -98,8 +111,12 @@ MAX_USER_CONNECTIONS 0 ;
 -- SSH restart server:
 -- systemctl restart mariadb
 
+-- (19) SLAVE
+-- On the slave, in DB (dev_zimelv or zimelv):
+STOP SLAVE
+
 -- (18) SLAVE
--- On dev_zimelv database:
+-- On dev_zimelv (or zimelv) database:
 -- -> Select DB: dev_zimelv or zimelv
 -- NB: MASTER_HOST='85.215.83.36', -- 85.214.146.139 | 85.215.83.36
 CHANGE master to
@@ -107,17 +124,17 @@ MASTER_HOST='85.215.83.36',
 MASTER_USER='replicator',
 MASTER_PASSWORD='wzudf_19646_HCSI'
 
--- (19) SLAVE
--- On the slave, in DB (dev_zimelv or zimelv):
-STOP SLAVE
+
 
 -- (20) SLAVE
 create database dev_zimelv
+create database zimelv
 
 -- (21) SLAVE
 -- Write the sql dump to the db:
 -- On SSH (NB: adjust for zimelv or dev_zimelv):
--- mysql --user=u501809312753 --password=pmKdzo_732Hg5 dev_zimelv < dev_zimelv.sql
+mysql --user=u501809312753 --password=pmKdzo_732Hg5 dev_zimelv < dev_zimelv.sql
+mysql --user=u501809312753 --password=pmKdzo_732Hg5 zimelv < zimelv.sql
 
 -- (22) MASTER / SLAVE
 -- On SSH restart server: 

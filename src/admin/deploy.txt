@@ -1,0 +1,63 @@
+Deploy server to dev
+================================================================================
+
+1. In VSC Terminal:
+Change to server:
+Press ctrl-shift-+ until server appears.
+
+2. In VSC Terminal:
+Change git remote for the server:
+git remote set-url origin https://github.com/zime-lv/dev-zime-lv-server.git
+
+3. In VSC Terminal:
+Deploy server to dev:
+npm run deploy
+
+
+Deploy client to dev
+================================================================================
+
+1. In VSC Terminal:
+Change to client:
+Press ctrl-shift-+ until client appears.
+
+2. In VSC Terminal:
+Change git remote for the client:
+git remote set-url origin https://github.com/zime-lv/dev-zime-lv.git
+
+3. In VSC Terminal:
+Deploy client to dev:
+npm run deploy
+
+
+Deploy server to live
+================================================================================
+
+1. In VSC Terminal:
+Change to server:
+Press ctrl-shift-+ until server appears.
+
+2. In VSC Terminal:
+Change git remote for the server:
+git remote set-url origin https://github.com/zime-lv/zime-lv-server.git
+
+3. In VSC Terminal:
+Deploy server to dev:
+npm run deploy
+
+
+Deploy client to live
+================================================================================
+
+1. In VSC Terminal:
+Change to client:
+Press ctrl-shift-+ until client appears.
+
+2. In VSC Terminal:
+Change git remote for the client:
+git remote set-url origin https://github.com/zime-lv/zime-lv.git
+
+3. In VSC Terminal:
+Deploy client to dev:
+npm run deploy
+
