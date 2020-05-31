@@ -1,8 +1,8 @@
 {
-  "name": "dev-zime-lv-server",
+  "name": "zime-lv-server",
   "homepage": ".",
   "version": "0.0.6",
-  "description": "ZIME LV Development Server",
+  "description": "ZIME LV Server",
   "private": true,
   "dependencies": {
     "dotenv": "^8.2.0",

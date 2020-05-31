@@ -104,6 +104,7 @@ git remote -v
 
 git remote remove origin
 git remote add origin https://zime-admin@dev.zime.lv/plesk-git/dev-zime-lv-server.git
+git remote set-url origin https://github.com/zime-lv/zime-lv-server.git
 git remote show origin
 git push -u origin master
 git push origin master
