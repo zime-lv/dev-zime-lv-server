@@ -1,0 +1,26 @@
+1. Make sure you are on develop branch.
+
+2. Create a release branch:
+-------------------------------------
+git checkout -b release-0.0.7 develop
+
+3. Increase version number of the package
+-------------------------------------
+In package.json:
+Change version to 0.0.7.
+
+4. Commit changes
+-------------------------------------
+git commit -a -m "Bumped version number to 0.0.7"
+
+5. Do the work
+-------------------------------------
+
+6. Finish the release branch:
+-------------------------------------
+git checkout master
+git merge --no-ff release-0.0.7
+git tag -a 0.0.7 -m "Released v0.0.7 for dev.zime.lv / zime.lv"
+git checkout develop
+git merge --no-ff release-0.0.7
+git branch -d release-0.0.7
