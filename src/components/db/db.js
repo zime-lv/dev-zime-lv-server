@@ -1838,7 +1838,9 @@ const getPurpose = ({
 
   name[0] = "SELECT purposes";
   sql[0] = `
-  SELECT p.id, p.business_id, p.purpose_id, COALESCE(pp.title, p.title) AS title, COALESCE(pp.description, p.description) AS description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+  SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+  , COALESCE(pp.title, p.title) AS title, COALESCE(pp.description, p.description) AS description
+  , pp.category, pp.subcategory, pp.subcategory2, pp.keywords, pp.link, pp.image
   FROM purposes AS p
   LEFT JOIN purpose_props AS pp
     ON pp.purpose_id = p.purpose_id
@@ -1963,7 +1965,8 @@ const getPurposeById = ({
 
   name[0] = "SELECT purposes";
   sql[0] = `
-    SELECT p.id, p.business_id, p.purpose_id, pp.title, pp.description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+    SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+    , pp.title, pp.description, pp.category, pp.subcategory, pp.subcategory2, pp.keywords, pp.link, pp.image
     FROM purposes AS p
     LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
     WHERE p.id = ? 
@@ -3026,6 +3029,10 @@ const updatePurposeProps = ({
   language = null,
   title = null,
   description = null,
+  category = null,
+  subcategory = null,
+  subcategory2 = null,
+  keywords = null,
   link = null,
   image = null,
   status = 0,
@@ -3041,11 +3048,15 @@ const updatePurposeProps = ({
   index++;
   name[index] = "MERGE purpose_props";
   sql[index] = `
-  INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
-  VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
+  INSERT INTO purpose_props (purpose_id, language, title, description, category, subcategory, subcategory2, keywords, link, image, status, created, reviser, workplace)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
   ON DUPLICATE KEY UPDATE
   title = COALESCE(?, title)
   , description = COALESCE(?, description)
+  , category = COALESCE(?, category)
+  , subcategory = COALESCE(?, subcategory)
+  , subcategory2 = COALESCE(?, subcategory2)
+  , keywords = COALESCE(?, keywords)
   , link = COALESCE(?, link)
   , image = COALESCE(?, image)
   , status = COALESCE(?, status)
@@ -3058,6 +3069,10 @@ const updatePurposeProps = ({
     language,
     title,
     description,
+    category,
+    subcategory,
+    subcategory2,
+    keywords,
     link,
     image,
     status,
@@ -3067,6 +3082,10 @@ const updatePurposeProps = ({
     // update vars
     title,
     description,
+    category,
+    subcategory,
+    subcategory2,
+    keywords,
     link,
     image,
     status,
@@ -3114,6 +3133,10 @@ const addPurpose = ({
   purpose_id = null,
   title = null,
   description = null,
+  category = null,
+  subcategory = null,
+  subcategory2 = null,
+  keywords = null,
   link = null,
   image = null,
   status = 0,
@@ -3146,14 +3169,18 @@ const addPurpose = ({
   index++;
   name[index] = "INSERT INTO purpose_props";
   sql[index] = `
-  INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
-  VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(), ?, ?)
+  INSERT INTO purpose_props (purpose_id, language, title, description, category, subcategory, subcategory2, keywords, link, image, status, created, reviser, workplace)
+  VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(), ?, ?)
   `;
   values[index] = [
     /* Insert values */
     language,
     title,
     description,
+    category,
+    subcategory,
+    subcategory2,
+    keywords,
     link,
     image,
     reviser,

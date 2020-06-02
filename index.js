@@ -9,7 +9,7 @@ const io = require("socket.io")(server, {
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
-  reconnectionAttempts: 99999,
+  reconnectionAttempts: Infinity, // 99999,
 });
 
 const { v4: uuidv4 } = require("uuid");
