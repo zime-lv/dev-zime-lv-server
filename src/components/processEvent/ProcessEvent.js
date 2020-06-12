@@ -15,14 +15,8 @@ const process = (args) => {
       }
 
       if (args.name === "VALIDATE SESSION" && args.status === "continue") {
-        // return session.saveToken(args.results.email, args);
         return session.validateToken(args);
       }
-
-      // if (args.name === "VALIDATE SESSION" && args.status === "finished") {
-      //   return session.saveToken(args.results.email, args);
-      //   // return session.validateToken(args);
-      // }
 
       /**
        * Send email validation request to new registerd users

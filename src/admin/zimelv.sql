@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS uri_settings (
 INSERT INTO uri_settings (uri, settings, created, reviser, workplace)
 VALUES 
 ("localhost", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM'),
-("dev.zime.lv", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM'),
-("zime.lv", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM');
+("dev.local-currency.com", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM'),
+("local-currency.com", '{"currencies":null,"currency":null,"currencyCreationAllowed":true,"logo":"gfx/zlogo_light.png"}', UTC_TIMESTAMP(), 'SYS', 'SYSTEM');
 
 --
 -- Currencies
@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS users (
     `website` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "website",
     `phone` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "phone",
 
-    `acc_curr` decimal(7,2) unsigned NOT NULL DEFAULT 0  COMMENT "current account",
-    `acc_cred` decimal(6,2) unsigned NOT NULL DEFAULT 0  COMMENT "credit account",
-    `acc_save` decimal(7,2) unsigned NOT NULL DEFAULT 0  COMMENT "savings account",
+    `acc_curr` decimal(10,5) unsigned NOT NULL DEFAULT 0  COMMENT "current account",
+    `acc_cred` decimal(9,5) unsigned NOT NULL DEFAULT 0  COMMENT "credit account",
+    `acc_save` decimal(10,5) unsigned NOT NULL DEFAULT 0  COMMENT "savings account",
     `allowance_date` date NULL COMMENT "allowance date",
 
     `currency_id` varchar(5) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT 'Z' COMMENT "currency abbreviation fid",
@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS purposes (
     `purpose_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose id",
     `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose title",
     `description` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose description",
+    `keywords` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose keywords",
     `status` int(1) NOT NULL DEFAULT 0  COMMENT "status",
     `created` datetime NULL  COMMENT "creation date and time",
     `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
@@ -196,33 +197,6 @@ CREATE TABLE IF NOT EXISTS purposes (
     FOREIGN KEY(`business_id`) REFERENCES businesses(`business_id`),
     INDEX `index_purpose` (`purpose_id`)
 ) ENGINE = InnoDB COMMENT = 'purposes';
-
-
---
--- Purpose properties
---
-CREATE TABLE IF NOT EXISTS purpose_props (
-    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
-    `purpose_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose id",
-    `language` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "language code",
-    `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose title",
-    `description` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose description",
-    `category` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose category",
-    `subcategory` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose subcategory",
-    `subcategory2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose subcategory2",
-    `keywords` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "purpose keywords",
-    `link` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "link to the product webpage",
-    `image` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "path to the product logo",
-    `status` int(1) NOT NULL DEFAULT 0  COMMENT "status",
-    `created` datetime NULL  COMMENT "creation date and time",
-    `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
-    `workplace` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "workplace",
-    `ts` timestamp NOT NULL  COMMENT "timestamp",
-    PRIMARY KEY (`id`),
-    UNIQUE KEY unique_purpose_language (`purpose_id`, `language`),
-    FOREIGN KEY(`purpose_id`) REFERENCES purposes(`purpose_id`),
-    INDEX `index_purpose` (`purpose_id`, `language`)
-) ENGINE = InnoDB COMMENT = 'purpose_props';
 
 --
 -- Shares
@@ -274,7 +248,7 @@ CREATE TABLE IF NOT EXISTS currency_sponsors (
 CREATE TABLE IF NOT EXISTS transactions (
     `transaction_id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
     `type` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT "transaction type",
-    `amount` decimal(7,2) unsigned NOT NULL DEFAULT 0  COMMENT "transaction value",
+    `amount` decimal(10,5) unsigned NOT NULL DEFAULT 0  COMMENT "transaction value",
     `currency` varchar(5) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT "currency abbreviation fid",
     `exchange_rate` decimal(6,5) unsigned NULL DEFAULT 1 COMMENT "currency exchange rate",
     `sender_id` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to user id",
@@ -303,7 +277,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS transaction_positions (
     `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
     `transaction_id` int(11) unsigned NOT NULL COMMENT "foreign key to user id",
-    `amount` decimal(7,2) unsigned NOT NULL DEFAULT 0  COMMENT "transaction position value",
+    `amount` decimal(10,5) unsigned NOT NULL DEFAULT 0  COMMENT "transaction position value",
     `recipient_id` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to user id",
     `recipient_pool_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to pool id",
     `roles` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "shareholder current roles",

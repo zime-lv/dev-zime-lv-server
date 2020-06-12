@@ -450,6 +450,7 @@ const userRequest = (args) => {
         onError: onRequestError,
 
         // user
+        uid: userData.uid,
         page: userData.page - 1,
         limit: userData.limit,
       });
@@ -484,6 +485,17 @@ const userRequest = (args) => {
         // user
         email: userData.email,
         currency_id: userData.currency_id,
+      });
+      break;
+
+    case "validate session":
+      db.getValidateSession({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
       });
       break;
 
