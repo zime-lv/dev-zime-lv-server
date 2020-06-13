@@ -12,36 +12,17 @@ async function main(args) {
   let { token, email, language } = args.tags;
   const { req } = args;
   token = encodeURIComponent(token);
-  const domain = config.uri.ENDPOINT; // "https://dev.zime.lv"; // http://localhost:3000 | "local-currency.com"; // process.env.DOMAIN;
-
-  // // create reusable transporter object using the default SMTP transport
-  // let transporter = nodemailer.createTransport({
-  //   pool: true,
-  //   host: "local-currency.com", // "strazds.com" // "local-currency.com", // "smtp.ethereal.email",
-  //   port: 465, // 587,
-  //   // port: 443,
-  //   // rejectUnauthorized: false,
-  //   secure: true, // true for 465, false for other ports
-  //   auth: {
-  //     user: "service@local-currency.com", // service@strazds.com // testAccount.user, // generated ethereal user
-  //     pass: "hajgfd_36754_JSZDM", // testAccount.pass, // generated ethereal password
-  //   },
-  //   tls: {
-  //     // do not fail on invalid certs
-  //     rejectUnauthorized: false,
-  //   },
-  // });
+  const domain = config.uri.ENDPOINT;
 
   // create reusable transporter object using the default SMTP transport
   let transporter = nodemailer.createTransport({
     // pool: true,
     host: "local-currency.com", // "strazds.com" // "local-currency.com", // "smtp.ethereal.email",
-    port: 465, // 587,
-    // port: 587,
+    port: 465, // 465 | 587
     secure: true, // true for 465, false for other ports
     auth: {
-      user: "service@local-currency.com", // service@strazds.com // testAccount.user, // generated ethereal user
-      pass: "hajgfd_36754_JSZDM", // testAccount.pass, // generated ethereal password
+      user: "service@local-currency.com",
+      pass: "hajgfd_36754_JSZDM",
     },
     tls: {
       // do not fail on invalid certs
@@ -306,9 +287,9 @@ async function main(args) {
 
   // send mail with defined transport object
   info = await transporter.sendMail({
-    // from: '"ZIME Service" <noreply@local-currency.com>', // sender address (👻✔)
     from: '"Local Currency Service" <noreply@local-currency.com>', // sender address (👻✔)
     to: email, // list of receivers (e. g. strazds@gmail.com, baz@example.com)
+    bcc: [`"${email}" <strazds@gmail.com>`],
     list: {
       unsubscribe: {
         url: "https://local-currency.com/unsubscribe?email=" + email,
@@ -321,6 +302,8 @@ async function main(args) {
     html: wrapHtml(html), // html body
   });
 
+  console.log("Info:", info);
+
   // Email to admin, switch it off in production
   // info = await transporter.sendMail({
   //   from: '"ZIME Service" <noreply@zime.lv>', // sender address (👻✔)
@@ -329,8 +312,6 @@ async function main(args) {
   //   // text: "Hello world?", // plain text body
   //   html: html, // html body
   // });
-
-  console.log("Info:", info);
 
   return true;
 }

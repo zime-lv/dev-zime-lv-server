@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS currencies (
     INDEX `index_abbr` (`abbr`) USING BTREE
 ) ENGINE = InnoDB COMMENT = 'currencies';
 INSERT INTO `currencies` (`name`, `abbr`, `rate`, `region`, `status`, `reviser`, `workplace`) 
-VALUES ('Zīme', 'Z', 1, '*', 0, 'SYSTEM', 'SYSTEM');
+VALUES ('Zime', 'Z', 1, '*', 0, 'SYSTEM', 'SYSTEM');
 
 --
 -- Users

@@ -7,7 +7,7 @@ git checkout -b release-0.0.7 develop
 3. Increase version number of the package
 -------------------------------------
 In package.json:
-- Change name to (server) "dev-zime-lv-server" (client) "dev-zime-lv"
+- Change name to (server) "local-currency-server" (client) "dev-zime-lv"
 - Change version to 0.0.7.
 
 2. Change git remote:

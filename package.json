@@ -1,8 +1,8 @@
 {
-  "name": "dev-zime-lv-server",
+  "name": "local-currency-server",
   "homepage": ".",
   "version": "0.0.7",
-  "description": "ZIME LV Server",
+  "description": "Local Currency Server",
   "private": true,
   "dependencies": {
     "dotenv": "^8.2.0",
@@ -38,7 +38,7 @@
     "url": "git+https://github.com/zime-lv/dev-zime-lv.git"
   },
   "keywords": [
-    "zime, local currencies, regional currencies"
+    "local currencies, regional currencies, complementary currencies, spending, zime"
   ],
   "author": "Armands Strazds",
   "license": "ISC",
