@@ -11,7 +11,7 @@ const { v4: uuidv4 } = require("uuid");
 const db = require("../db/db");
 const processError = require("../processError/ProcessError");
 const processEvent = require("../processEvent/ProcessEvent");
-const utoken = require("../../utils/utoken");
+// const utoken = require("../../utils/utoken");
 
 let onResult = null;
 
@@ -143,6 +143,26 @@ const userRequest = (args) => {
         // user
         uid: userData.uid,
         language: userData.language,
+        dateStart: userData.dateStart,
+        dateEnd: userData.dateEnd,
+        search: userData.search,
+        page: userData.page - 1,
+        limit: userData.limit,
+      });
+      break;
+
+    case "find transactions":
+      db.findTransactions({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+
+        // user
+        uid: userData.uid,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
@@ -451,6 +471,23 @@ const userRequest = (args) => {
 
         // user
         uid: userData.uid,
+        page: userData.page - 1,
+        limit: userData.limit,
+      });
+      break;
+
+    case "find currencies":
+      db.findCurrencies({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+
+        // user
+        uid: userData.uid,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });

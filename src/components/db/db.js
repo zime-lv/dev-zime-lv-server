@@ -807,6 +807,155 @@ const getTransactions = ({
   // user
   uid = null,
   language = null,
+  dateStart = null,
+  dateEnd = null,
+  search = "%",
+  page = 0,
+  limit = 5,
+}) => {
+  // Process dates
+  if (dateStart === "") dateStart = null;
+  if (dateEnd === "") dateEnd = null;
+
+  // Process search
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
+
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT transactions";
+  sql[index] = `
+  SELECT *
+  FROM (
+    SELECT 'sender' AS tid, (tp.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, tp.recipient_id, tp.roles, tp.share, tp.share_per_cent, 
+    us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+    ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+    b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+    p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+    t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+    FROM transaction_positions AS tp 
+    LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+    LEFT JOIN users AS us ON us.uid = t.sender_id
+    LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+    LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+    LEFT JOIN businesses as b ON b.business_id = p.business_id
+    WHERE tp.recipient_id = ?
+    AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+    AND ( 
+      t.comment LIKE ?
+      OR us.firstname LIKE ?
+      OR us.lastname LIKE ?
+      OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+    )
+
+    UNION ALL
+
+    SELECT 'receiver' AS tid, (t.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, '-' AS recipient_id, '-' AS roles, '-' AS share, '-' AS share_per_cent,
+    us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+    ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+    b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+    p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+    t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+    FROM transactions AS t
+    LEFT JOIN transaction_positions AS tp ON tp.transaction_id = t.transaction_id
+    LEFT JOIN users AS us ON us.uid = t.sender_id
+    LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+    LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+    LEFT JOIN businesses as b ON b.business_id = p.business_id
+    WHERE t.sender_id = ?
+    AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+    AND ( 
+      t.comment LIKE ?
+      OR ur.firstname LIKE ?
+      OR ur.lastname LIKE ?
+      OR CONCAT(ur.firstname, " ", ur.lastname) LIKE ?
+    )
+    GROUP BY tp.transaction_id
+    
+  ) a
+  ORDER BY created DESC, conv_amount
+  LIMIT ? OFFSET ?
+    `;
+  values[index] = [
+    // sender
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+
+    // receiver
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+
+    //
+    limit,
+    page * limit,
+  ];
+
+  index++;
+  name[index] = "COUNT transactions";
+  sql[index] = `
+    SELECT
+    (
+      SELECT COUNT(*)
+      FROM transaction_positions AS tp
+      LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+      WHERE tp.recipient_id = ?
+    ) +
+    (
+      SELECT COUNT(*)
+      FROM transactions
+      WHERE sender_id = ?
+    )
+    AS count_transaction_positions
+  `;
+  values[index] = [uid, uid];
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+/**
+ * Find Transactions
+ * @param {*} param0
+ */
+const findTransactions = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  uid = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
@@ -830,6 +979,7 @@ const getTransactions = ({
     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     WHERE tp.recipient_id = ?
+    -- AND t.comment != "allowance"
 
     UNION ALL
 
@@ -1282,9 +1432,86 @@ const getCurrencies = ({
   index++;
   name[index] = "COUNT currencies";
   sql[index] = `
-    SELECT COUNT(*) count_currencies FROM currencies;
+    SELECT COUNT(*) count_currencies 
+    FROM currencies
+    WHERE status < 2;
   `;
   values[index] = [];
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+/**
+ * Find currencies
+ * @param {*} param0
+ */
+const findCurrencies = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user
+  uid = null,
+  search = "%",
+  page = 0,
+  limit = 5,
+}) => {
+  search = search.split("*").join("%");
+
+  if (search.indexOf("%") < 0) search = `%${search}%`;
+
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT currencies";
+  sql[index] = `
+    SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
+    FROM currencies AS c
+    LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
+    WHERE 
+      c.name LIKE ?
+      OR c.abbr LIKE ?
+      OR c.region LIKE ?
+    AND c.status < 2
+    GROUP BY c.abbr
+    ORDER BY u.currency_id DESC, c.abbr
+    LIMIT ? OFFSET ?
+    `; // suspended account status = 2
+  values[index] = [uid, search, search, search, limit, page * limit];
+
+  index++;
+  name[index] = "COUNT currencies";
+  sql[index] = `
+    SELECT COUNT(*) count_currencies 
+    FROM currencies
+    WHERE 
+      name LIKE ?
+      OR abbr LIKE ?
+      OR region LIKE ?
+    AND status < 2;
+  `;
+  values[index] = [search, search, search];
 
   let queries = [
     {
@@ -3535,56 +3762,58 @@ eventEmitter.on("error", function (err) {
 module.exports = {
   // setSocket: setSocket,
   // addCurrency: addCurrency,
-  getSequence: getSequence,
-  mergeUser: mergeUser,
-  endSession: endSession,
-  mergeSession: mergeSession,
-  mergeBusiness: mergeBusiness,
-  mergeCurrency: mergeCurrency,
-  // emitCurrency: emitCurrency,
-  getTAN: getTAN,
-  processTAN: processTAN,
-  saveCart: saveCart,
-  getCart: getCart,
-  transferU2S: transferU2S,
-  transferU2U: transferU2U,
-  transferU2B: transferU2B,
-  transferV2U: transferV2U,
-  // transferP2B: transferP2B,
-  // initUser: initUser,
-  getUriSettings: getUriSettings,
-  signInUser: signInUser,
-  // lastSeenUser: lastSeenUser,
-  resetPassword: resetPassword,
-  getUser: getUser,
-  uploadFile: uploadFile,
-  getAccount: getAccount,
-  getValidateSession: getValidateSession,
-  getBusiness: getBusiness,
-  getBusinessById: getBusinessById,
-  getCartPurposes: getCartPurposes,
-  getPurpose: getPurpose,
-  getPurposeById: getPurposeById,
-  getShare: getShare,
-  getShareholderById: getShareholderById,
-  getCurrencyById: getCurrencyById,
-  getTransactionById: getTransactionById,
-  getCurrencies: getCurrencies,
-  getTransactions: getTransactions,
-  getShares: getShares,
-  updatePurposeProps: updatePurposeProps,
-  addPurpose: addPurpose,
-  changePurposeStatus: changePurposeStatus,
-  mergeShareholder: mergeShareholder,
-  removeShareholder: removeShareholder,
-  saveMessage: saveMessage,
-  // mergeShares: mergeShares,
-  // mergePool: mergePool,
-  // mergePoolUsers: mergePoolUsers,
-  mergeUserLanguage: mergeUserLanguage,
-  mergeUserCurrency: mergeUserCurrency,
-  validateEmailToken: validateEmailToken,
-  resendValidateEmailToken: resendValidateEmailToken,
-  validatePasswordResetToken: validatePasswordResetToken,
-  unknownRequest: unknownRequest,
+  getSequence,
+  mergeUser,
+  endSession,
+  mergeSession,
+  mergeBusiness,
+  mergeCurrency,
+  // emitCurrency,
+  getTAN,
+  processTAN,
+  saveCart,
+  getCart,
+  transferU2S,
+  transferU2U,
+  transferU2B,
+  transferV2U,
+  // transferP2B,
+  // initUser,
+  getUriSettings,
+  signInUser,
+  // lastSeenUser,
+  resetPassword,
+  getUser,
+  uploadFile,
+  getAccount,
+  getValidateSession,
+  getBusiness,
+  getBusinessById,
+  getCartPurposes,
+  getPurpose,
+  getPurposeById,
+  getShare,
+  getShareholderById,
+  getCurrencyById,
+  getTransactionById,
+  getCurrencies,
+  findCurrencies,
+  getTransactions,
+  findTransactions,
+  getShares,
+  updatePurposeProps,
+  addPurpose,
+  changePurposeStatus,
+  mergeShareholder,
+  removeShareholder,
+  saveMessage,
+  //  mergeShares,
+  //  mergePool,
+  //  mergePoolUsers,
+  mergeUserLanguage,
+  mergeUserCurrency,
+  validateEmailToken,
+  resendValidateEmailToken,
+  validatePasswordResetToken,
+  unknownRequest,
 };
