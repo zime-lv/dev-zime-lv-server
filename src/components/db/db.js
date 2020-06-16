@@ -818,6 +818,7 @@ const getTransactions = ({
   if (dateEnd === "") dateEnd = null;
 
   // Process search
+  if (search === null) search = "*";
   search = search.split("*").join("%");
   if (search.indexOf("%") < 0) search = `%${search}%`;
 
@@ -844,6 +845,7 @@ const getTransactions = ({
     AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
     AND ( 
       t.comment LIKE ?
+      OR t.purpose_id LIKE ?
       OR us.firstname LIKE ?
       OR us.lastname LIKE ?
       OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
@@ -867,6 +869,7 @@ const getTransactions = ({
     AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
     AND ( 
       t.comment LIKE ?
+      OR t.purpose_id LIKE ?
       OR ur.firstname LIKE ?
       OR ur.lastname LIKE ?
       OR CONCAT(ur.firstname, " ", ur.lastname) LIKE ?
@@ -886,11 +889,13 @@ const getTransactions = ({
     search,
     search,
     search,
+    search,
 
     // receiver
     uid,
     dateStart,
     dateEnd,
+    search,
     search,
     search,
     search,
@@ -909,16 +914,54 @@ const getTransactions = ({
       SELECT COUNT(*)
       FROM transaction_positions AS tp
       LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+      LEFT JOIN users AS us ON us.uid = t.sender_id
       WHERE tp.recipient_id = ?
+      AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+      AND ( 
+        t.comment LIKE ?
+        OR t.purpose_id LIKE ?
+        OR us.firstname LIKE ?
+        OR us.lastname LIKE ?
+        OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+      )
     ) +
     (
       SELECT COUNT(*)
-      FROM transactions
-      WHERE sender_id = ?
+      FROM transactions AS t
+      LEFT JOIN users AS us ON us.uid = t.sender_id
+      WHERE t.sender_id = ?
+      AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+      AND ( 
+        t.comment LIKE ?
+        OR t.purpose_id LIKE ?
+        OR us.firstname LIKE ?
+        OR us.lastname LIKE ?
+        OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+      )
     )
     AS count_transaction_positions
   `;
-  values[index] = [uid, uid];
+  values[index] = [
+    // sender
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+
+    // receiver
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+  ];
 
   let queries = [
     {
@@ -941,108 +984,108 @@ const getTransactions = ({
   return db.mergeIntoDb(queries);
 };
 
-/**
- * Find Transactions
- * @param {*} param0
- */
-const findTransactions = ({
-  // system
-  req = null,
-  reqData = null,
-  session = null,
-  onStatusChange = () => {},
-  onError = () => {},
+// /**
+//  * Find Transactions
+//  * @param {*} param0
+//  */
+// const findTransactions = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
 
-  // user
-  uid = null,
-  search = "%",
-  page = 0,
-  limit = 5,
-}) => {
-  let { name, sql, values, index } = validateSession({ session });
+//   // user
+//   uid = null,
+//   search = "%",
+//   page = 0,
+//   limit = 5,
+// }) => {
+//   let { name, sql, values, index } = validateSession({ session });
 
-  index++;
-  name[index] = "SELECT transactions";
-  sql[index] = `
-  SELECT *
-  FROM (
-    SELECT 'sender' AS tid, (tp.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, tp.recipient_id, tp.roles, tp.share, tp.share_per_cent, 
-    us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
-    ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
-    b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
-    p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
-    t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
-    FROM transaction_positions AS tp 
-    LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
-    LEFT JOIN users AS us ON us.uid = t.sender_id
-    LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
-    LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
-    LEFT JOIN businesses as b ON b.business_id = p.business_id
-    WHERE tp.recipient_id = ?
-    -- AND t.comment != "allowance"
+//   index++;
+//   name[index] = "SELECT transactions";
+//   sql[index] = `
+//   SELECT *
+//   FROM (
+//     SELECT 'sender' AS tid, (tp.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, tp.recipient_id, tp.roles, tp.share, tp.share_per_cent,
+//     us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+//     ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+//     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+//     p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+//     t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+//     FROM transaction_positions AS tp
+//     LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+//     LEFT JOIN users AS us ON us.uid = t.sender_id
+//     LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+//     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+//     LEFT JOIN businesses as b ON b.business_id = p.business_id
+//     WHERE tp.recipient_id = ?
+//     -- AND t.comment != "allowance"
 
-    UNION ALL
+//     UNION ALL
 
-    SELECT 'receiver' AS tid, (t.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, '-' AS recipient_id, '-' AS roles, '-' AS share, '-' AS share_per_cent,
-    us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
-    ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
-    b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
-    p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
-    t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
-    FROM transactions AS t
-    LEFT JOIN transaction_positions AS tp ON tp.transaction_id = t.transaction_id
-    LEFT JOIN users AS us ON us.uid = t.sender_id
-    LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
-    LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
-    LEFT JOIN businesses as b ON b.business_id = p.business_id
-    WHERE t.sender_id = ?
-    GROUP BY tp.transaction_id
-    
-  ) a
-  ORDER BY created DESC, conv_amount
-  LIMIT ? OFFSET ?
-    `;
-  values[index] = [uid, uid, limit, page * limit];
+//     SELECT 'receiver' AS tid, (t.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, '-' AS recipient_id, '-' AS roles, '-' AS share, '-' AS share_per_cent,
+//     us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+//     ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+//     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+//     p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+//     t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+//     FROM transactions AS t
+//     LEFT JOIN transaction_positions AS tp ON tp.transaction_id = t.transaction_id
+//     LEFT JOIN users AS us ON us.uid = t.sender_id
+//     LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+//     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+//     LEFT JOIN businesses as b ON b.business_id = p.business_id
+//     WHERE t.sender_id = ?
+//     GROUP BY tp.transaction_id
 
-  index++;
-  name[index] = "COUNT transactions";
-  sql[index] = `
-    SELECT
-    (
-      SELECT COUNT(*)
-      FROM transaction_positions AS tp
-      LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
-      WHERE tp.recipient_id = ?
-    ) +
-    (
-      SELECT COUNT(*)
-      FROM transactions
-      WHERE sender_id = ?
-    )
-    AS count_transaction_positions
-  `;
-  values[index] = [uid, uid];
+//   ) a
+//   ORDER BY created DESC, conv_amount
+//   LIMIT ? OFFSET ?
+//     `;
+//   values[index] = [uid, uid, limit, page * limit];
 
-  let queries = [
-    {
-      // system
-      req: req,
-      reqData: reqData,
-      session: session,
-      onStatusChange: onStatusChange,
-      onError: onError,
+//   index++;
+//   name[index] = "COUNT transactions";
+//   sql[index] = `
+//     SELECT
+//     (
+//       SELECT COUNT(*)
+//       FROM transaction_positions AS tp
+//       LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+//       WHERE tp.recipient_id = ?
+//     ) +
+//     (
+//       SELECT COUNT(*)
+//       FROM transactions
+//       WHERE sender_id = ?
+//     )
+//     AS count_transaction_positions
+//   `;
+//   values[index] = [uid, uid];
 
-      // query
-      name: name[0],
-      sql: sql[0],
-      values: values[0],
-    },
-  ];
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
 
-  queries = pushQueries(queries, name, sql, values, index);
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
 
-  return db.mergeIntoDb(queries);
-};
+//   queries = pushQueries(queries, name, sql, values, index);
+
+//   return db.mergeIntoDb(queries);
+// };
 
 /**
  * Get shares
@@ -1059,9 +1102,15 @@ const getShares = ({
   // user
   uid = null,
   language = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
+
   let { name, sql, values, index } = validateSession({ session });
 
   index++;
@@ -1084,20 +1133,33 @@ const getShares = ({
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     LEFT JOIN users as o ON o.uid = b.owner_id
     WHERE s.shareholder_id = ?
-    AND s.status < ?
+    AND s.status < 2
+    AND (
+      b.title LIKE ?
+      OR p.title LIKE ?
+      OR s.roles LIKE ?
+    )
     ORDER BY shares_created DESC, shares_title
     LIMIT ? OFFSET ?
     `;
-  values[index] = [uid, 2, limit, page * limit];
+  values[index] = [uid, search, search, search, limit, page * limit];
 
   index++;
   name[index] = "COUNT shares";
   sql[index] = `
     SELECT COUNT(*) as count_shares
-    FROM shares
-    WHERE shareholder_id = ?
+    FROM shares AS s
+    LEFT JOIN purposes as p ON p.purpose_id = s.purpose_id
+    LEFT JOIN businesses as b ON b.business_id = p.business_id
+    WHERE s.shareholder_id = ?
+    AND s.status < 2
+    AND (
+      b.title LIKE ?
+      OR p.title LIKE ?
+      OR s.roles LIKE ?
+    )
   `;
-  values[index] = [uid];
+  values[index] = [uid, search, search, search];
 
   let queries = [
     {
@@ -1407,78 +1469,13 @@ const getCurrencies = ({
 
   // user
   uid = null,
-  page = 0,
-  limit = 5,
-}) => {
-  // let name = [];
-  // let sql = [];
-  // let values = [];
-
-  let { name, sql, values, index } = validateSession({ session });
-
-  index++;
-  name[index] = "SELECT currencies";
-  sql[index] = `
-    SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
-    FROM currencies AS c
-    LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
-    WHERE c.status < 2
-    GROUP BY c.abbr
-    ORDER BY u.currency_id DESC, c.abbr
-    LIMIT ? OFFSET ?
-    `; // suspended account status = 2
-  values[index] = [uid, limit, page * limit];
-
-  index++;
-  name[index] = "COUNT currencies";
-  sql[index] = `
-    SELECT COUNT(*) count_currencies 
-    FROM currencies
-    WHERE status < 2;
-  `;
-  values[index] = [];
-
-  let queries = [
-    {
-      // system
-      req: req,
-      reqData: reqData,
-      session: session,
-      onStatusChange: onStatusChange,
-      onError: onError,
-
-      // query
-      name: name[0],
-      sql: sql[0],
-      values: values[0],
-    },
-  ];
-
-  queries = pushQueries(queries, name, sql, values, index);
-
-  return db.mergeIntoDb(queries);
-};
-
-/**
- * Find currencies
- * @param {*} param0
- */
-const findCurrencies = ({
-  // system
-  req = null,
-  reqData = null,
-  session = null,
-  onStatusChange = () => {},
-  onError = () => {},
-
-  // user
-  uid = null,
   search = "%",
   page = 0,
   limit = 5,
 }) => {
+  // Process search
+  if (search === null) search = "*";
   search = search.split("*").join("%");
-
   if (search.indexOf("%") < 0) search = `%${search}%`;
 
   let { name, sql, values, index } = validateSession({ session });
@@ -1489,10 +1486,11 @@ const findCurrencies = ({
     SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
     FROM currencies AS c
     LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
-    WHERE 
+    WHERE (
       c.name LIKE ?
       OR c.abbr LIKE ?
       OR c.region LIKE ?
+    )
     AND c.status < 2
     GROUP BY c.abbr
     ORDER BY u.currency_id DESC, c.abbr
@@ -1533,6 +1531,82 @@ const findCurrencies = ({
 
   return db.mergeIntoDb(queries);
 };
+
+// /**
+//  * Find currencies
+//  * @param {*} param0
+//  */
+// const findCurrencies = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
+
+//   // user
+//   uid = null,
+//   search = "%",
+//   page = 0,
+//   limit = 5,
+// }) => {
+//   search = search.split("*").join("%");
+
+//   if (search.indexOf("%") < 0) search = `%${search}%`;
+
+//   let { name, sql, values, index } = validateSession({ session });
+
+//   index++;
+//   name[index] = "SELECT currencies";
+//   sql[index] = `
+//     SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
+//     FROM currencies AS c
+//     LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
+//     WHERE (
+//       c.name LIKE ?
+//       OR c.abbr LIKE ?
+//       OR c.region LIKE ?
+//     )
+//     AND c.status < 2
+//     GROUP BY c.abbr
+//     ORDER BY u.currency_id DESC, c.abbr
+//     LIMIT ? OFFSET ?
+//     `; // suspended account status = 2
+//   values[index] = [uid, search, search, search, limit, page * limit];
+
+//   index++;
+//   name[index] = "COUNT currencies";
+//   sql[index] = `
+//     SELECT COUNT(*) count_currencies
+//     FROM currencies
+//     WHERE
+//       name LIKE ?
+//       OR abbr LIKE ?
+//       OR region LIKE ?
+//     AND status < 2;
+//   `;
+//   values[index] = [search, search, search];
+
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
+
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
+
+//   queries = pushQueries(queries, name, sql, values, index);
+
+//   return db.mergeIntoDb(queries);
+// };
 
 /**
  * Register user language
@@ -2050,46 +2124,63 @@ const getPurpose = ({
   // user
   business_id = null,
   language = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  // SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
-  // , COALESCE(pp.title, p.title) AS title, COALESCE(pp.description, p.description) AS description
-  // , pp.category, pp.subcategory, pp.subcategory2, pp.keywords, pp.link, pp.image
-  // FROM purposes AS p
-  // LEFT JOIN purpose_props AS pp
-  //   ON pp.purpose_id = p.purpose_id
-  //   AND (pp.language = ? OR pp.language IS NULL)
-  // WHERE p.business_id = ?
-  // AND p.status < 2
-  // ORDER BY pp.title
-  // LIMIT ? OFFSET ?
-  //   `; // suspended account status = 2
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
 
-  name[0] = "SELECT purposes";
-  sql[0] = `
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT purposes";
+  sql[index] = `
   SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
   , p.title, p.description, p.keywords
   FROM purposes AS p
   WHERE p.business_id = ?
   AND p.status < 2
+  AND (
+    p.title LIKE ?
+    OR p.description LIKE ?
+    OR p.keywords LIKE ?
+    OR p.purpose_id LIKE ?
+  )
   ORDER BY p.title
   LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[0] = [business_id, limit, page * limit];
+  values[index] = [
+    business_id,
+    search,
+    search,
+    search,
+    search,
+    limit,
+    page * limit,
+  ];
 
-  name[1] = "COUNT purposes";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT purposes";
+  sql[index] = `
     SELECT COUNT(*) as count_purposes
     FROM purposes
     WHERE business_id = ?
     AND status < 2
+    AND (
+      title LIKE ?
+      OR description LIKE ?
+      OR keywords LIKE ?
+      OR purpose_id LIKE ?
+    )
   `;
-  values[1] = [business_id];
+  values[index] = [business_id, search, search, search, search];
 
   let queries = [
     {
@@ -2105,16 +2196,10 @@ const getPurpose = ({
       sql: sql[0],
       values: values[0],
     },
-
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
 
-  // return db.selectFromDb(queries);
+  queries = pushQueries(queries, name, sql, values, index);
+
   return db.mergeIntoDb(queries);
 };
 
@@ -3797,9 +3882,9 @@ module.exports = {
   getCurrencyById,
   getTransactionById,
   getCurrencies,
-  findCurrencies,
+  // findCurrencies,
   getTransactions,
-  findTransactions,
+  // findTransactions,
   getShares,
   updatePurposeProps,
   addPurpose,

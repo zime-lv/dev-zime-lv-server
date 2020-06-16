@@ -151,22 +151,22 @@ const userRequest = (args) => {
       });
       break;
 
-    case "find transactions":
-      db.findTransactions({
-        // system
-        req: data.req,
-        session: data.session,
-        reqData: userData,
-        onStatusChange: onStatusChange,
-        onError: onRequestError,
+    // case "find transactions":
+    //   db.findTransactions({
+    //     // system
+    //     req: data.req,
+    //     session: data.session,
+    //     reqData: userData,
+    //     onStatusChange: onStatusChange,
+    //     onError: onRequestError,
 
-        // user
-        uid: userData.uid,
-        search: userData.search,
-        page: userData.page - 1,
-        limit: userData.limit,
-      });
-      break;
+    //     // user
+    //     uid: userData.uid,
+    //     search: userData.search,
+    //     page: userData.page - 1,
+    //     limit: userData.limit,
+    //   });
+    //   break;
 
     case "get shares":
       db.getShares({
@@ -180,6 +180,7 @@ const userRequest = (args) => {
         // user
         uid: userData.uid,
         language: userData.language,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
@@ -471,27 +472,28 @@ const userRequest = (args) => {
 
         // user
         uid: userData.uid,
-        page: userData.page - 1,
-        limit: userData.limit,
-      });
-      break;
-
-    case "find currencies":
-      db.findCurrencies({
-        // system
-        req: data.req,
-        session: data.session,
-        reqData: userData,
-        onStatusChange: onStatusChange,
-        onError: onRequestError,
-
-        // user
-        uid: userData.uid,
         search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
       break;
+
+    // case "find currencies":
+    //   db.findCurrencies({
+    //     // system
+    //     req: data.req,
+    //     session: data.session,
+    //     reqData: userData,
+    //     onStatusChange: onStatusChange,
+    //     onError: onRequestError,
+
+    //     // user
+    //     uid: userData.uid,
+    //     search: userData.search,
+    //     page: userData.page - 1,
+    //     limit: userData.limit,
+    //   });
+    //   break;
 
     case "register user language":
       db.mergeUserLanguage({
@@ -565,6 +567,7 @@ const userRequest = (args) => {
         // user
         business_id: userData.business_id,
         language: userData.language,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
