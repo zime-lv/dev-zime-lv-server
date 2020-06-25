@@ -23,6 +23,7 @@ const process = (args) => {
        */
       if (
         (args.req === "register user" ||
+          args.req === "update user" ||
           args.req === "resend validate email token") &&
         args.status === "success"
       ) {

@@ -46,6 +46,7 @@ async function main(args) {
   switch (req) {
     case "resend validate email token":
     case "register user":
+    case "update user":
       if (language === "lv") {
         subject = `Tava aktivizācijas saite`;
         html = `

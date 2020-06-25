@@ -174,6 +174,7 @@ const mergeUser = ({
   firstname = null,
   lastname = null,
   email = null,
+  newEmail = null,
 
   birthdate = null,
   timezone = null,
@@ -217,9 +218,18 @@ const mergeUser = ({
     }
   }
 
-  index++;
-  name[index] = "INSERT INTO users";
-  sql[index] = `
+  if (
+    newEmail !== null &&
+    firstname === null &&
+    lastname === null &&
+    pw === null
+  ) {
+    // do not update email here!
+    // Yet allow to update other fields.
+  } else {
+    index++;
+    name[index] = "INSERT INTO users";
+    sql[index] = `
     INSERT INTO users (firstname, lastname, email, pw, acc_curr, acc_cred, acc_save, allowance_date, language, status, created, reviser, workplace)
     VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, 0, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE 
@@ -240,44 +250,73 @@ const mergeUser = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
     `;
-  values[index] = [
-    /* Insert values */
-    // uid,
-    firstname,
-    lastname,
-    email,
-    pw !== null ? hash(`${salt}${pw}`) : null,
+    values[index] = [
+      /* Insert values */
+      // uid,
+      firstname,
+      lastname,
+      email,
+      pw !== null ? hash(`${salt}${pw}`) : null,
 
-    // website,
-    // phone,
-    0, // acc_curr,
-    1000, // acc_cred,
-    0, // acc_save,
-    language,
-    // 0, // status
-    reviser,
-    workplace,
+      // website,
+      // phone,
+      0, // acc_curr,
+      1000, // acc_cred,
+      0, // acc_save,
+      language,
+      // 0, // status
+      reviser,
+      workplace,
 
-    /* Update values */
-    uid,
-    firstname,
-    lastname,
-    email,
-    pw !== null ? hash(`${salt}${pw}`) : null,
+      /* Update values */
+      uid,
+      firstname,
+      lastname,
+      email,
+      pw !== null ? hash(`${salt}${pw}`) : null,
 
-    birthdate,
-    timezone,
+      birthdate,
+      timezone,
 
-    website,
-    phone,
-    acc_curr,
-    acc_cred,
-    acc_save,
-    language,
-    status,
-    reviser,
-    workplace,
-  ];
+      website,
+      phone,
+      acc_curr,
+      acc_cred,
+      acc_save,
+      language,
+      status,
+      reviser,
+      workplace,
+    ];
+  }
+
+  /**
+   * Save the new email address
+   */
+  if (newEmail !== null) {
+    index++;
+    name[index] = "UPDATE users SET email";
+    sql[index] = `
+    UPDATE users
+    SET email = ?
+    , status = 0
+    WHERE email = ?
+    `;
+    values[index] = [
+      /* Update values */
+      newEmail,
+      email,
+    ];
+
+    index++;
+    name[index] = "DELETE FROM validation tokens";
+    sql[index] = `
+    DELETE FROM validation_tokens
+    WHERE type = 'email'
+    AND email = ?
+    `;
+    values[index] = [email];
+  }
 
   let token = null;
   if (validateEmail) {
@@ -294,7 +333,7 @@ const mergeUser = ({
     `;
     values[index] = [
       /* Insert values */
-      email,
+      newEmail === null ? email : newEmail,
       token,
       0, // status
       reviser,
@@ -317,7 +356,11 @@ const mergeUser = ({
 
       // user
       email: email,
-      tags: { token: token, email: email, language: language },
+      tags: {
+        token: token,
+        email: newEmail === null ? email : newEmail,
+        language: language,
+      },
       uid: uid,
 
       // query
@@ -1727,8 +1770,12 @@ const validateEmailToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  // let { name, sql, values, index } = validateSession({ session });
+  let index = -1;
+
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET status = ?
     WHERE type = 'email'
@@ -1736,15 +1783,25 @@ const validateEmailToken = ({
     AND token = ? 
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [1, email, token]; // status 1 = validated
+  values[index] = [1, email, token]; // status 1 = validated
 
-  name[1] = "UPDATE users";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE users";
+  sql[index] = `
     UPDATE users
     SET status = ?
     WHERE email = ? 
     `;
-  values[1] = [1, email]; // user status: 0 = not validated, 1 = validated
+  values[index] = [1, email]; // user status: 0 = not validated, 1 = validated
+
+  // index++;
+  // name[index] = "DELETE FROM validation tokens";
+  // sql[index] = `
+  //   DELETE FROM validation_tokens
+  //   WHERE type = 'email'
+  //   AND email = ?
+  //   `;
+  // values[index] = [email];
 
   let queries = [
     {
@@ -1760,13 +1817,9 @@ const validateEmailToken = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1792,8 +1845,12 @@ const resendValidateEmailToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  // let { name, sql, values, index } = validateSession({ session });
+
+  let index = -1;
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET resent = resent + 1
     WHERE type = 'email'
@@ -1802,16 +1859,17 @@ const resendValidateEmailToken = ({
     AND status = 0
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [email, token]; // status 0 = not validated
+  values[index] = [email, token]; // status 0 = not validated
 
-  name[1] = "SELECT validation_tokens";
-  sql[1] = `
+  index++;
+  name[index] = "SELECT validation_tokens";
+  sql[index] = `
     SELECT resent
     FROM validation_tokens
     WHERE email = ?
     AND type = 'email' 
     `;
-  values[1] = [email];
+  values[index] = [email];
 
   let queries = [
     {
@@ -1831,13 +1889,15 @@ const resendValidateEmailToken = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
+    // {
+    //   // query
+    //   name: name[1],
+    //   sql: sql[1],
+    //   values: values[1],
+    // },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1862,8 +1922,10 @@ const validatePasswordResetToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  let index = -1;
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET status = ?
     WHERE type = 'password'
@@ -1871,7 +1933,7 @@ const validatePasswordResetToken = ({
     AND token = ? 
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [1, email, token]; // status 1 = validated
+  values[index] = [1, email, token]; // status 1 = validated
 
   let queries = [
     {

@@ -316,8 +316,6 @@ const userRequest = (args) => {
       break;
 
     case "update user":
-      // if (!validateSession(data.session, userData.email)) return;
-
       db.mergeUser({
         // system
         req: data.req,
@@ -328,6 +326,9 @@ const userRequest = (args) => {
 
         // user
         email: userData.email,
+        newEmail:
+          typeof userData.newEmail === "undefined" ? null : userData.newEmail,
+        validateEmail: userData.validateEmail,
         uid: userData.personalID,
         firstname: userData.firstName,
         lastname: userData.lastName,
