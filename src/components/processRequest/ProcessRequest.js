@@ -891,8 +891,6 @@ const userRequest = (args) => {
       break;
 
     case "get tan":
-      // if (!validateSession(data.session, userData.email)) return;
-
       db.getTAN({
         // system
         req: data.req,
@@ -978,12 +976,17 @@ const userRequest = (args) => {
 
         // user
         uid: data.uid,
+
+        // transfers: userData.transfers,
         sender_id: userData.uid,
         fromAccount: userData.fromAccount,
         purpose_id: userData.purposeID,
         currency: userData.currency,
         amount: userData.amount,
         description: userData.description,
+        cart: typeof userData.cart === "undefined" ? null : userData.cart,
+        merchant:
+          typeof userData.merchant === "undefined" ? null : userData.merchant,
         reviser: userData.reviser,
         workplace: userData.workplace,
       });

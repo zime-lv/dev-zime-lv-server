@@ -2842,27 +2842,35 @@ const getCart = ({
   customer = null,
   cart = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "SELECT carts";
-  sql[0] = `
-    SELECT type, cartid, content
-    FROM carts
-    WHERE cartid = ?  
-    AND expiration >= UTC_TIMESTAMP()
-    AND status = 0
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT carts";
+  sql[index] = `
+    SELECT c.type, c.cartid, c.content, c.merchant, c.expiration, c.status, c.created
+    , b.title AS business_title, b.description AS business_description, b.status AS business_status, b.created AS business_created, b.owner_id
+    , u.firstname AS owner_firstname, u.lastname AS owner_lastname, u.email AS owner_email, u.language AS owner_language, u.status AS owner_status
+    FROM carts AS c
+    INNER JOIN businesses AS b ON b.business_id = c.merchant
+    INNER JOIN users AS u ON u.uid = b.owner_id
+    WHERE c.cartid = ?  
+    AND c.expiration >= UTC_TIMESTAMP()
+    AND c.status = 0
     `; // suspended account status = 2
-  values[0] = [cart];
+  values[index] = [cart];
 
-  name[1] = "UPDATE carts";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE carts";
+  sql[index] = `
     UPDATE carts
     SET customer = ?
     WHERE cartid = ?  
     `; // suspended account status = 2
-  values[1] = [customer, cart];
+  values[index] = [customer, cart];
 
   let queries = [
     {
@@ -2878,14 +2886,9 @@ const getCart = ({
       sql: sql[0],
       values: values[0],
     },
-
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
@@ -2994,7 +2997,7 @@ const transferU2U = ({
   return db.mergeIntoDb(queries);
 };
 
-const transferU2B = ({
+const transferU2B_BAK = ({
   // system
   req = null,
   reqData = null,
@@ -3039,8 +3042,9 @@ const transferU2B = ({
     reviser = ?,
     workplace = ?
     WHERE uid = ?
+    AND ${fromAccount} - ? >= 0
     `;
-  values[index] = [amount, reviser, workplace, sender_id];
+  values[index] = [amount, reviser, workplace, sender_id, amount];
 
   index++;
   name[index] = "UPDATE shareholders";
@@ -3048,10 +3052,10 @@ const transferU2B = ({
   UPDATE users AS u
   LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
-  SET u.${toAccount} = u.${toAccount} + ROUND(? / 
+  SET u.${toAccount} = u.${toAccount} + ROUND(? /
     (
-      SELECT SUM(s2.share) 
-      FROM shares AS s2 
+      SELECT SUM(s2.share)
+      FROM shares AS s2
       WHERE s2.purpose_id = s1.purpose_id
     ) * s1.share, 5),
   u.reviser = ?,
@@ -3079,21 +3083,21 @@ const transferU2B = ({
   name[index] = "INSERT INTO transaction_positions";
   sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
-  SELECT '[INSERT_ID]', 
+  SELECT '[INSERT_ID]',
   (
-    ? / 
+    ? /
     (
-      SELECT SUM(s2.share) 
-      FROM shares AS s2 WHERE 
+      SELECT SUM(s2.share)
+      FROM shares AS s2 WHERE
       s2.purpose_id = s1.purpose_id
     ) * s1.share
   ) AS amount,
   s1.shareholder_id, s1.roles, s1.share,
   (
-    100 / 
+    100 /
     (
-      SELECT SUM(s3.share) 
-      FROM shares AS s3 WHERE 
+      SELECT SUM(s3.share)
+      FROM shares AS s3 WHERE
       s3.purpose_id = s1.purpose_id
     ) * s1.share
   ) AS share_per_cent,
@@ -3128,6 +3132,332 @@ const transferU2B = ({
 
   return db.mergeIntoDb(queries);
 };
+
+const transferU2B = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user args
+  uid = null,
+  sender_id = null,
+  fromAccount = null,
+  toAccount = "acc_curr",
+  purpose_id = null,
+  currency = "Z",
+  amount = null,
+  description = null,
+  cart = null,
+  merchant = null,
+  reviser = null,
+  workplace = null,
+}) => {
+  if (amount <= 0) {
+    onError({
+      req: req,
+      reqData: reqData,
+      session: session,
+      error: { code: "INVALID_AMOUNT" },
+      context: ["db.js", "transferU2B", "amount <= 0"],
+    });
+    return;
+  }
+
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
+
+  let { name, sql, values, index } = validateSession({ session });
+
+  purpose_id.forEach((p, i) => {
+    index++;
+    name[index] = "UPDATE sender";
+    sql[index] = `
+      UPDATE users
+      SET ${fromAccount[i]} = ${fromAccount[i]} - ?,
+      reviser = ?,
+      workplace = ?
+      WHERE uid = ?
+      AND ${fromAccount[i]} - ? >= 0
+      `;
+    values[index] = [amount[i], reviser, workplace, sender_id, amount[i]];
+
+    index++;
+    name[index] = "UPDATE shareholders";
+    sql[index] = `
+      UPDATE users AS u
+      LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
+      LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+      SET u.${toAccount} = u.${toAccount} + ROUND(? /
+        (
+          SELECT SUM(s2.share)
+          FROM shares AS s2
+          WHERE s2.purpose_id = s1.purpose_id
+        ) * s1.share, 5),
+      u.reviser = ?,
+      u.workplace = ?
+      WHERE p.purpose_id = ?
+      `;
+    values[index] = [amount[i], reviser, workplace, purpose_id[i]];
+
+    index++;
+    name[index] = "INSERT INTO transactions";
+    sql[index] = `
+      INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, purpose_id, merchant, comment, created, reviser, workplace)
+      VALUES (?, ?, ?, (SELECT rate FROM currencies WHERE abbr = ?), ?, ?, ?, ?, UTC_TIMESTAMP(), 'SYS', 'SYSTEM')`;
+    values[index] = [
+      req,
+      amount[i],
+      currency[i],
+      currency[i],
+      sender_id,
+      purpose_id[i],
+      merchant,
+      description,
+    ];
+
+    index++;
+    name[index] = "INSERT INTO transaction_positions";
+    sql[index] = `
+      INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
+      SELECT '[INSERT_ID]',
+      (
+        ? /
+        (
+          SELECT SUM(s2.share)
+          FROM shares AS s2 WHERE
+          s2.purpose_id = s1.purpose_id
+        ) * s1.share
+      ) AS amount,
+      s1.shareholder_id, s1.roles, s1.share,
+      (
+        100 /
+        (
+          SELECT SUM(s3.share)
+          FROM shares AS s3 WHERE
+          s3.purpose_id = s1.purpose_id
+        ) * s1.share
+      ) AS share_per_cent,
+      '${fromAccount[i]}', '${toAccount}', UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM'
+      FROM shares AS s1
+      LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+      LEFT JOIN users AS u ON u.uid = s1.shareholder_id
+      WHERE s1.purpose_id = ?
+      `;
+    values[index] = [amount[i], purpose_id[i]];
+  });
+
+  /**
+   * Set cart status to payed (1)
+   */
+  if (cart !== null) {
+    index++;
+    name[index] = "UPDATE carts";
+    sql[index] = `
+      UPDATE carts
+      SET status = 1
+      WHERE cartid = ?
+      AND status = 0
+      `;
+    values[index] = [cart];
+  }
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // user
+      uid: uid,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+// const transferU2B = (args) => {
+//   const { req, reqData, session, onStatusChange, onError, uid } = args;
+
+//   let { name, sql, values, index } = validateSession({ session });
+
+//   let queries = [];
+//   args.transfers.forEach((transfer) => {
+//     transfer.req = req;
+//     transfer.reqData = reqData;
+//     transfer.session = session;
+//     transfer.onStatusChange = onStatusChange;
+//     transfer.onError = onError;
+//     transfer.uid = uid; // is it really necessary?
+
+//     transfer.name = name;
+//     transfer.sql = sql;
+//     transfer.values = values;
+//     transfer.index = index;
+//     console.log("transfer2:", transfer);
+
+//     queries = addTransferU2B(transfer);
+//   });
+
+//   // let queries = addTransferU2B(args);
+
+//   queries[0].req = req;
+//   queries[0].reqData = reqData;
+//   queries[0].session = session;
+//   queries[0].onStatusChange = onStatusChange;
+//   queries[0].onError = onError;
+//   queries[0].uid = uid; // is it really necessary?
+
+//   // return [
+//   //   {
+//   //     // system
+//   //     req: req,
+//   //     reqData: reqData,
+//   //     session: session,
+//   //     onStatusChange: onStatusChange,
+//   //     onError: onError,
+
+//   //     // user
+//   //     uid: uid,
+
+//   //     // query
+//   //     name: name[0],
+//   //     sql: sql[0],
+//   //     values: values[0],
+//   //   },
+//   // ];
+
+//   return db.mergeIntoDb(queries);
+// };
+
+// const addTransferU2B = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
+
+//   // user args
+//   uid = null,
+//   sender_id = null,
+//   fromAccount = null,
+//   toAccount = "acc_curr",
+//   purpose_id = null,
+//   currency = "Z",
+//   amount = null,
+//   description = null,
+//   reviser = null,
+//   workplace = null,
+
+//   // out vars
+//   // transferID = 0,
+//   queries = [],
+//   name = [],
+//   sql = [],
+//   values = [],
+//   index = 0,
+// }) => {
+//   if (amount <= 0) {
+//     onError({
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       error: { code: "INVALID_AMOUNT" },
+//       context: ["db.js", "transferU2B", "amount <= 0"],
+//     });
+//     return;
+//   }
+
+//   index++;
+//   name[index] = "UPDATE sender";
+//   sql[index] = `
+//     UPDATE users
+//     SET ${fromAccount} = ${fromAccount} - ?,
+//     reviser = ?,
+//     workplace = ?
+//     WHERE uid = ?
+//     `;
+//   values[index] = [amount, reviser, workplace, sender_id];
+
+//   index++;
+//   name[index] = "UPDATE shareholders";
+//   sql[index] = `
+//   UPDATE users AS u
+//   LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
+//   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+//   SET u.${toAccount} = u.${toAccount} + ROUND(? /
+//     (
+//       SELECT SUM(s2.share)
+//       FROM shares AS s2
+//       WHERE s2.purpose_id = s1.purpose_id
+//     ) * s1.share, 5),
+//   u.reviser = ?,
+//   u.workplace = ?
+//   WHERE p.purpose_id = ?
+//   `;
+//   values[index] = [amount, reviser, workplace, purpose_id];
+
+//   index++;
+//   name[index] = "INSERT INTO transactions";
+//   sql[index] = `
+//   INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, purpose_id, comment, created, reviser, workplace)
+//   VALUES (?, ?, ?, (SELECT rate FROM currencies WHERE abbr = ?), ?, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
+//   values[index] = [
+//     req,
+//     amount,
+//     currency,
+//     currency,
+//     sender_id,
+//     purpose_id,
+//     description,
+//   ];
+
+//   index++;
+//   name[index] = "INSERT INTO transaction_positions";
+//   sql[index] = `
+//   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
+//   SELECT '[INSERT_ID]',
+//   (
+//     ? /
+//     (
+//       SELECT SUM(s2.share)
+//       FROM shares AS s2 WHERE
+//       s2.purpose_id = s1.purpose_id
+//     ) * s1.share
+//   ) AS amount,
+//   s1.shareholder_id, s1.roles, s1.share,
+//   (
+//     100 /
+//     (
+//       SELECT SUM(s3.share)
+//       FROM shares AS s3 WHERE
+//       s3.purpose_id = s1.purpose_id
+//     ) * s1.share
+//   ) AS share_per_cent,
+//   '${fromAccount}', '${toAccount}', UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM'
+//   FROM shares AS s1
+//   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+//   LEFT JOIN users AS u ON u.uid = s1.shareholder_id
+//   WHERE s1.purpose_id = ?
+//   `;
+//   values[index] = [amount, purpose_id];
+
+//   return pushQueries(queries, name, sql, values, index);
+// };
 
 /**
  * Transfer the allowance
@@ -3923,6 +4253,7 @@ module.exports = {
   transferU2S,
   transferU2U,
   transferU2B,
+  // transferU2BMulti,
   transferV2U,
   // transferP2B,
   // initUser,

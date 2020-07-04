@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     `sequence` int(2) NULL COMMENT "user sequence per timezone per day",
     `birthdate` date NULL COMMENT "user date of birth",
-    `timezone` varchar(64) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "user timezone at birth",
+    `timezone` varchar(64) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "user timezone",
 
     `website` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "website",
     `phone` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "phone",
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     `exchange_rate` decimal(6,5) unsigned NULL DEFAULT 1 COMMENT "currency exchange rate",
     `sender_id` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to user id",
     `purpose_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to purpose id",
-    `sender_pool_id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "foreign key to pool id",
+    `merchant` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "merchants business ID",
     `comment` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "comment",
     `status` int(1) NOT NULL DEFAULT 0  COMMENT "status",
     `created` datetime NULL  COMMENT "creation date and time",
@@ -264,11 +264,11 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY(`currency`) REFERENCES currencies(`abbr`),
     FOREIGN KEY(`sender_id`) REFERENCES users(`uid`),
     FOREIGN KEY(`purpose_id`) REFERENCES purposes(`purpose_id`),
-    FOREIGN KEY(`sender_pool_id`) REFERENCES pools(`pool_id`),
+    FOREIGN KEY(`merchant`) REFERENCES businesses(`business_id`),
     INDEX `index_type` (`type`),
     INDEX `index_sender` (`sender_id`),
     INDEX `index_purpose` (`purpose_id`),
-    INDEX `index_sender_pool` (`sender_pool_id`)
+    INDEX `index_merchant` (`merchant`)
 ) ENGINE = InnoDB COMMENT = 'transactions';
 
 --
