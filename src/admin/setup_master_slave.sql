@@ -94,7 +94,7 @@ MAX_USER_CONNECTIONS 0 ;
 
 -- (15) SLAVE
 -- In Plesk:
--- -> Databases -> (select subscription: zime.lv) -> Database servers -> Click: Toolbox (right side)
+-- -> Databases -> (select subscription: local-currency.com) -> Database servers -> Click: Toolbox (right side)
 -- -> Click: Replication -> If configured as master: SSH -> etc/my.cnf.d, remove master entries under [mysqld], then restart mysql server: systemctl restart mariadb
 -- -> (Click: Replication again, if necessary) -> Slave replication/click: configure
 

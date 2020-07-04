@@ -174,6 +174,7 @@ const mergeUser = ({
   firstname = null,
   lastname = null,
   email = null,
+  newEmail = null,
 
   birthdate = null,
   timezone = null,
@@ -217,9 +218,18 @@ const mergeUser = ({
     }
   }
 
-  index++;
-  name[index] = "INSERT INTO users";
-  sql[index] = `
+  if (
+    newEmail !== null &&
+    firstname === null &&
+    lastname === null &&
+    pw === null
+  ) {
+    // do not update email here!
+    // Yet allow to update other fields.
+  } else {
+    index++;
+    name[index] = "INSERT INTO users";
+    sql[index] = `
     INSERT INTO users (firstname, lastname, email, pw, acc_curr, acc_cred, acc_save, allowance_date, language, status, created, reviser, workplace)
     VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, 0, UTC_TIMESTAMP(), ?, ?)
     ON DUPLICATE KEY UPDATE 
@@ -240,44 +250,73 @@ const mergeUser = ({
     , reviser = COALESCE(?, reviser)
     , workplace = COALESCE(?, workplace)
     `;
-  values[index] = [
-    /* Insert values */
-    // uid,
-    firstname,
-    lastname,
-    email,
-    pw !== null ? hash(`${salt}${pw}`) : null,
+    values[index] = [
+      /* Insert values */
+      // uid,
+      firstname,
+      lastname,
+      email,
+      pw !== null ? hash(`${salt}${pw}`) : null,
 
-    // website,
-    // phone,
-    0, // acc_curr,
-    1000, // acc_cred,
-    0, // acc_save,
-    language,
-    // 0, // status
-    reviser,
-    workplace,
+      // website,
+      // phone,
+      0, // acc_curr,
+      1000, // acc_cred,
+      0, // acc_save,
+      language,
+      // 0, // status
+      reviser,
+      workplace,
 
-    /* Update values */
-    uid,
-    firstname,
-    lastname,
-    email,
-    pw !== null ? hash(`${salt}${pw}`) : null,
+      /* Update values */
+      uid,
+      firstname,
+      lastname,
+      email,
+      pw !== null ? hash(`${salt}${pw}`) : null,
 
-    birthdate,
-    timezone,
+      birthdate,
+      timezone,
 
-    website,
-    phone,
-    acc_curr,
-    acc_cred,
-    acc_save,
-    language,
-    status,
-    reviser,
-    workplace,
-  ];
+      website,
+      phone,
+      acc_curr,
+      acc_cred,
+      acc_save,
+      language,
+      status,
+      reviser,
+      workplace,
+    ];
+  }
+
+  /**
+   * Save the new email address
+   */
+  if (newEmail !== null) {
+    index++;
+    name[index] = "UPDATE users SET email";
+    sql[index] = `
+    UPDATE users
+    SET email = ?
+    , status = 0
+    WHERE email = ?
+    `;
+    values[index] = [
+      /* Update values */
+      newEmail,
+      email,
+    ];
+
+    index++;
+    name[index] = "DELETE FROM validation tokens";
+    sql[index] = `
+    DELETE FROM validation_tokens
+    WHERE type = 'email'
+    AND email = ?
+    `;
+    values[index] = [email];
+  }
 
   let token = null;
   if (validateEmail) {
@@ -294,7 +333,7 @@ const mergeUser = ({
     `;
     values[index] = [
       /* Insert values */
-      email,
+      newEmail === null ? email : newEmail,
       token,
       0, // status
       reviser,
@@ -317,7 +356,11 @@ const mergeUser = ({
 
       // user
       email: email,
-      tags: { token: token, email: email, language: language },
+      tags: {
+        token: token,
+        email: newEmail === null ? email : newEmail,
+        language: language,
+      },
       uid: uid,
 
       // query
@@ -807,9 +850,21 @@ const getTransactions = ({
   // user
   uid = null,
   language = null,
+  dateStart = null,
+  dateEnd = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
+  // Process dates
+  if (dateStart === "") dateStart = null;
+  if (dateEnd === "") dateEnd = null;
+
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
+
   let { name, sql, values, index } = validateSession({ session });
 
   index++;
@@ -830,6 +885,14 @@ const getTransactions = ({
     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     WHERE tp.recipient_id = ?
+    AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+    AND ( 
+      t.comment LIKE ?
+      OR t.purpose_id LIKE ?
+      OR us.firstname LIKE ?
+      OR us.lastname LIKE ?
+      OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+    )
 
     UNION ALL
 
@@ -846,13 +909,45 @@ const getTransactions = ({
     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     WHERE t.sender_id = ?
+    AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+    AND ( 
+      t.comment LIKE ?
+      OR t.purpose_id LIKE ?
+      OR ur.firstname LIKE ?
+      OR ur.lastname LIKE ?
+      OR CONCAT(ur.firstname, " ", ur.lastname) LIKE ?
+    )
     GROUP BY tp.transaction_id
     
   ) a
   ORDER BY created DESC, conv_amount
   LIMIT ? OFFSET ?
     `;
-  values[index] = [uid, uid, limit, page * limit];
+  values[index] = [
+    // sender
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+
+    // receiver
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+
+    //
+    limit,
+    page * limit,
+  ];
 
   index++;
   name[index] = "COUNT transactions";
@@ -862,16 +957,54 @@ const getTransactions = ({
       SELECT COUNT(*)
       FROM transaction_positions AS tp
       LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+      LEFT JOIN users AS us ON us.uid = t.sender_id
       WHERE tp.recipient_id = ?
+      AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+      AND ( 
+        t.comment LIKE ?
+        OR t.purpose_id LIKE ?
+        OR us.firstname LIKE ?
+        OR us.lastname LIKE ?
+        OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+      )
     ) +
     (
       SELECT COUNT(*)
-      FROM transactions
-      WHERE sender_id = ?
+      FROM transactions AS t
+      LEFT JOIN users AS us ON us.uid = t.sender_id
+      WHERE t.sender_id = ?
+      AND (t.created BETWEEN COALESCE(?, '1970-01-01') AND DATE_ADD(COALESCE(?, UTC_TIMESTAMP()), INTERVAL 1 DAY))
+      AND ( 
+        t.comment LIKE ?
+        OR t.purpose_id LIKE ?
+        OR us.firstname LIKE ?
+        OR us.lastname LIKE ?
+        OR CONCAT(us.firstname, " ", us.lastname) LIKE ?
+      )
     )
     AS count_transaction_positions
   `;
-  values[index] = [uid, uid];
+  values[index] = [
+    // sender
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+
+    // receiver
+    uid,
+    dateStart,
+    dateEnd,
+    search,
+    search,
+    search,
+    search,
+    search,
+  ];
 
   let queries = [
     {
@@ -894,6 +1027,109 @@ const getTransactions = ({
   return db.mergeIntoDb(queries);
 };
 
+// /**
+//  * Find Transactions
+//  * @param {*} param0
+//  */
+// const findTransactions = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
+
+//   // user
+//   uid = null,
+//   search = "%",
+//   page = 0,
+//   limit = 5,
+// }) => {
+//   let { name, sql, values, index } = validateSession({ session });
+
+//   index++;
+//   name[index] = "SELECT transactions";
+//   sql[index] = `
+//   SELECT *
+//   FROM (
+//     SELECT 'sender' AS tid, (tp.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, tp.recipient_id, tp.roles, tp.share, tp.share_per_cent,
+//     us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+//     ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+//     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+//     p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+//     t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+//     FROM transaction_positions AS tp
+//     LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+//     LEFT JOIN users AS us ON us.uid = t.sender_id
+//     LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+//     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+//     LEFT JOIN businesses as b ON b.business_id = p.business_id
+//     WHERE tp.recipient_id = ?
+//     -- AND t.comment != "allowance"
+
+//     UNION ALL
+
+//     SELECT 'receiver' AS tid, (t.amount * t.exchange_rate) as conv_amount, tp.from_account AS from_account, tp.to_account AS to_account, '-' AS recipient_id, '-' AS roles, '-' AS share, '-' AS share_per_cent,
+//     us.firstname AS sender_firstname, us.lastname AS sender_lastname, us.status AS sender_status,
+//     ur.firstname AS recipient_firstname, ur.lastname AS recipient_lastname, ur.status AS recipient_status,
+//     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
+//     p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
+//     t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') AS created
+//     FROM transactions AS t
+//     LEFT JOIN transaction_positions AS tp ON tp.transaction_id = t.transaction_id
+//     LEFT JOIN users AS us ON us.uid = t.sender_id
+//     LEFT JOIN users AS ur ON ur.uid = tp.recipient_id
+//     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+//     LEFT JOIN businesses as b ON b.business_id = p.business_id
+//     WHERE t.sender_id = ?
+//     GROUP BY tp.transaction_id
+
+//   ) a
+//   ORDER BY created DESC, conv_amount
+//   LIMIT ? OFFSET ?
+//     `;
+//   values[index] = [uid, uid, limit, page * limit];
+
+//   index++;
+//   name[index] = "COUNT transactions";
+//   sql[index] = `
+//     SELECT
+//     (
+//       SELECT COUNT(*)
+//       FROM transaction_positions AS tp
+//       LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+//       WHERE tp.recipient_id = ?
+//     ) +
+//     (
+//       SELECT COUNT(*)
+//       FROM transactions
+//       WHERE sender_id = ?
+//     )
+//     AS count_transaction_positions
+//   `;
+//   values[index] = [uid, uid];
+
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
+
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
+
+//   queries = pushQueries(queries, name, sql, values, index);
+
+//   return db.mergeIntoDb(queries);
+// };
+
 /**
  * Get shares
  * @param {*} param0
@@ -909,16 +1145,22 @@ const getShares = ({
   // user
   uid = null,
   language = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
+
   let { name, sql, values, index } = validateSession({ session });
 
   index++;
   name[index] = "SELECT shares";
   sql[index] = `
     SELECT s.shareholder_id, s.purpose_id, s.title AS shares_title, s.description AS shares_description, s.roles AS shares_roles, s.share AS shares_share, s.status AS shares_status, DATE_FORMAT(s.created, '%Y-%m-%d %H:%i:%s') as shares_created,
-    pp.title AS purpose_title, pp.description AS purpose_description, pp.link AS purpose_link, pp.image AS purpose_image, p.status AS purpose_status,
+    p.title AS purpose_title, p.description AS purpose_description, '' AS purpose_link, '' AS purpose_image, p.status AS purpose_status,
     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status,
     o.uid AS owner_uid, o.firstname AS owner_firstname, o.lastname AS owner_lastname, o.status AS owner_status,
     (
@@ -931,25 +1173,36 @@ const getShares = ({
     ) AS share_per_cent
     FROM shares AS s
     LEFT JOIN purposes as p ON p.purpose_id = s.purpose_id
-    LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     LEFT JOIN users as o ON o.uid = b.owner_id
     WHERE s.shareholder_id = ?
-    AND s.status < ?
-    AND pp.language = ?
+    AND s.status < 2
+    AND (
+      b.title LIKE ?
+      OR p.title LIKE ?
+      OR s.roles LIKE ?
+    )
     ORDER BY shares_created DESC, shares_title
     LIMIT ? OFFSET ?
     `;
-  values[index] = [uid, 2, language, limit, page * limit];
+  values[index] = [uid, search, search, search, limit, page * limit];
 
   index++;
   name[index] = "COUNT shares";
   sql[index] = `
     SELECT COUNT(*) as count_shares
-    FROM shares
-    WHERE shareholder_id = ?
+    FROM shares AS s
+    LEFT JOIN purposes as p ON p.purpose_id = s.purpose_id
+    LEFT JOIN businesses as b ON b.business_id = p.business_id
+    WHERE s.shareholder_id = ?
+    AND s.status < 2
+    AND (
+      b.title LIKE ?
+      OR p.title LIKE ?
+      OR s.roles LIKE ?
+    )
   `;
-  values[index] = [uid];
+  values[index] = [uid, search, search, search];
 
   let queries = [
     {
@@ -1258,34 +1511,48 @@ const getCurrencies = ({
   onError = () => {},
 
   // user
+  uid = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
-  // let name = [];
-  // let sql = [];
-  // let values = [];
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
 
   let { name, sql, values, index } = validateSession({ session });
 
   index++;
   name[index] = "SELECT currencies";
   sql[index] = `
-    SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created, COUNT(cs.abbr) AS sponsors
+    SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
     FROM currencies AS c
-    LEFT JOIN currency_sponsors AS cs ON cs.abbr = c.abbr
-    WHERE c.status < 2
+    LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
+    WHERE (
+      c.name LIKE ?
+      OR c.abbr LIKE ?
+      OR c.region LIKE ?
+    )
+    AND c.status < 2
     GROUP BY c.abbr
-    ORDER BY sponsors DESC, c.abbr
+    ORDER BY u.currency_id DESC, c.abbr
     LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[index] = [limit, page * limit];
+  values[index] = [uid, search, search, search, limit, page * limit];
 
   index++;
   name[index] = "COUNT currencies";
   sql[index] = `
-    SELECT COUNT(*) count_currencies FROM currencies;
+    SELECT COUNT(*) count_currencies 
+    FROM currencies
+    WHERE 
+      name LIKE ?
+      OR abbr LIKE ?
+      OR region LIKE ?
+    AND status < 2;
   `;
-  values[index] = [];
+  values[index] = [search, search, search];
 
   let queries = [
     {
@@ -1307,6 +1574,82 @@ const getCurrencies = ({
 
   return db.mergeIntoDb(queries);
 };
+
+// /**
+//  * Find currencies
+//  * @param {*} param0
+//  */
+// const findCurrencies = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
+
+//   // user
+//   uid = null,
+//   search = "%",
+//   page = 0,
+//   limit = 5,
+// }) => {
+//   search = search.split("*").join("%");
+
+//   if (search.indexOf("%") < 0) search = `%${search}%`;
+
+//   let { name, sql, values, index } = validateSession({ session });
+
+//   index++;
+//   name[index] = "SELECT currencies";
+//   sql[index] = `
+//     SELECT c.name, c.abbr, c.rate, c.region, c.status, DATE_FORMAT(c.created, '%Y-%m-%d %H:%i:%s') as created
+//     FROM currencies AS c
+//     LEFT JOIN users AS u ON u.currency_id = c.abbr AND u.uid = ?
+//     WHERE (
+//       c.name LIKE ?
+//       OR c.abbr LIKE ?
+//       OR c.region LIKE ?
+//     )
+//     AND c.status < 2
+//     GROUP BY c.abbr
+//     ORDER BY u.currency_id DESC, c.abbr
+//     LIMIT ? OFFSET ?
+//     `; // suspended account status = 2
+//   values[index] = [uid, search, search, search, limit, page * limit];
+
+//   index++;
+//   name[index] = "COUNT currencies";
+//   sql[index] = `
+//     SELECT COUNT(*) count_currencies
+//     FROM currencies
+//     WHERE
+//       name LIKE ?
+//       OR abbr LIKE ?
+//       OR region LIKE ?
+//     AND status < 2;
+//   `;
+//   values[index] = [search, search, search];
+
+//   let queries = [
+//     {
+//       // system
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       onStatusChange: onStatusChange,
+//       onError: onError,
+
+//       // query
+//       name: name[0],
+//       sql: sql[0],
+//       values: values[0],
+//     },
+//   ];
+
+//   queries = pushQueries(queries, name, sql, values, index);
+
+//   return db.mergeIntoDb(queries);
+// };
 
 /**
  * Register user language
@@ -1427,8 +1770,12 @@ const validateEmailToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  // let { name, sql, values, index } = validateSession({ session });
+  let index = -1;
+
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET status = ?
     WHERE type = 'email'
@@ -1436,15 +1783,25 @@ const validateEmailToken = ({
     AND token = ? 
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [1, email, token]; // status 1 = validated
+  values[index] = [1, email, token]; // status 1 = validated
 
-  name[1] = "UPDATE users";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE users";
+  sql[index] = `
     UPDATE users
     SET status = ?
     WHERE email = ? 
     `;
-  values[1] = [1, email]; // user status: 0 = not validated, 1 = validated
+  values[index] = [1, email]; // user status: 0 = not validated, 1 = validated
+
+  // index++;
+  // name[index] = "DELETE FROM validation tokens";
+  // sql[index] = `
+  //   DELETE FROM validation_tokens
+  //   WHERE type = 'email'
+  //   AND email = ?
+  //   `;
+  // values[index] = [email];
 
   let queries = [
     {
@@ -1460,13 +1817,9 @@ const validateEmailToken = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1492,8 +1845,12 @@ const resendValidateEmailToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  // let { name, sql, values, index } = validateSession({ session });
+
+  let index = -1;
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET resent = resent + 1
     WHERE type = 'email'
@@ -1502,16 +1859,17 @@ const resendValidateEmailToken = ({
     AND status = 0
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [email, token]; // status 0 = not validated
+  values[index] = [email, token]; // status 0 = not validated
 
-  name[1] = "SELECT validation_tokens";
-  sql[1] = `
+  index++;
+  name[index] = "SELECT validation_tokens";
+  sql[index] = `
     SELECT resent
     FROM validation_tokens
     WHERE email = ?
     AND type = 'email' 
     `;
-  values[1] = [email];
+  values[index] = [email];
 
   let queries = [
     {
@@ -1531,13 +1889,15 @@ const resendValidateEmailToken = ({
       sql: sql[0],
       values: values[0],
     },
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
+    // {
+    //   // query
+    //   name: name[1],
+    //   sql: sql[1],
+    //   values: values[1],
+    // },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   return db.mergeIntoDb(queries);
 };
@@ -1562,8 +1922,10 @@ const validatePasswordResetToken = ({
   let sql = [];
   let values = [];
 
-  name[0] = "UPDATE validation tokens";
-  sql[0] = `
+  let index = -1;
+  index++;
+  name[index] = "UPDATE validation tokens";
+  sql[index] = `
     UPDATE validation_tokens
     SET status = ?
     WHERE type = 'password'
@@ -1571,7 +1933,40 @@ const validatePasswordResetToken = ({
     AND token = ? 
     AND expiration >= UTC_TIMESTAMP()
     `;
-  values[0] = [1, email, token]; // status 1 = validated
+  values[index] = [1, email, token]; // status 1 = validated
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  return db.mergeIntoDb(queries);
+};
+
+/**
+ * Get account (for log in)
+ * @param {*} param0
+ */
+const getValidateSession = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+}) => {
+  let { name, sql, values, index } = validateSession({ session });
 
   let queries = [
     {
@@ -1621,6 +2016,7 @@ const getBusiness = ({
     SELECT business_id, title, description, link, image, status, DATE_FORMAT(created, '%Y-%m-%d %H:%i:%s') as created
     FROM businesses 
     WHERE owner_id = ? AND status < 2
+    ORDER BY title
     LIMIT ? OFFSET ?
     `; // suspended account status = 2
   values[index] = [uid, limit, page * limit];
@@ -1730,16 +2126,14 @@ const getCartPurposes = ({
 
   name[0] = "SELECT purposes";
   sql[0] = `
-    SELECT p.business_id, p.purpose_id, pp.title, pp.description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+    SELECT p.business_id, p.purpose_id, p.title, p.description, '' AS link, '' AS image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
     FROM purposes AS p
-    LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
     WHERE p.purpose_id IN (?) 
     AND p.status = 1
-    AND pp.language = ?
-    ORDER BY pp.title
+    ORDER BY p.title
     LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[0] = [purposes_array, language, limit, page * limit];
+  values[0] = [purposes_array, limit, page * limit];
 
   name[1] = "COUNT purposes";
   sql[1] = `
@@ -1792,72 +2186,63 @@ const getPurpose = ({
   // user
   business_id = null,
   language = null,
+  search = "%",
   page = 0,
   limit = 5,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  // SELECT p.business_id, p.purpose_id, COALESCE(pp.title, p.title) AS title, COALESCE(pp.description, p.description) AS description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
-  // FROM purposes AS p
-  // LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
-  // WHERE p.business_id = ?
-  // AND p.status < 2
-  // AND pp.language = ?
-  // ORDER BY pp.title
-  // LIMIT ? OFFSET ?
+  // Process search
+  if (search === null) search = "*";
+  search = search.split("*").join("%");
+  if (search.indexOf("%") < 0) search = `%${search}%`;
 
-  // SELECT p.business_id, p.purpose_id, p.title, p.description, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
-  // FROM purposes AS p
-  // WHERE p.business_id = ?
-  // AND p.status < 2
-  // ORDER BY p.title
-  // LIMIT ? OFFSET ?
+  let { name, sql, values, index } = validateSession({ session });
 
-  // SELECT p.business_id, p.purpose_id, COALESCE(
-  //   (
-  //     SELECT pp1.title
-  //     FROM purpose_props AS pp1
-  //     WHERE pp1.purpose_id = p.purpose_id
-  //     AND pp1.language = ?
-  //   ), p.title
-  // ) AS title, COALESCE(
-  //   (
-  //     SELECT pp2.description
-  //     FROM purpose_props AS pp2
-  //     WHERE pp2.purpose_id = p.purpose_id
-  //     AND pp2.language = ?
-  //   ), p.description
-  // ) AS description, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
-  // FROM purposes AS p
-  // WHERE p.business_id = ?
-  // AND p.status < 2
-  // ORDER BY p.title
-  // LIMIT ? OFFSET ?
-
-  name[0] = "SELECT purposes";
-  sql[0] = `
-  SELECT p.id, p.business_id, p.purpose_id, COALESCE(pp.title, p.title) AS title, COALESCE(pp.description, p.description) AS description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+  index++;
+  name[index] = "SELECT purposes";
+  sql[index] = `
+  SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+  , p.title, p.description, p.keywords
   FROM purposes AS p
-  LEFT JOIN purpose_props AS pp
-    ON pp.purpose_id = p.purpose_id
-    AND (pp.language = ? OR pp.language IS NULL)
   WHERE p.business_id = ?
   AND p.status < 2
-  ORDER BY pp.title
+  AND (
+    p.title LIKE ?
+    OR p.description LIKE ?
+    OR p.keywords LIKE ?
+    OR p.purpose_id LIKE ?
+  )
+  ORDER BY p.title
   LIMIT ? OFFSET ?
     `; // suspended account status = 2
-  values[0] = [language, business_id, limit, page * limit];
+  values[index] = [
+    business_id,
+    search,
+    search,
+    search,
+    search,
+    limit,
+    page * limit,
+  ];
 
-  name[1] = "COUNT purposes";
-  sql[1] = `
+  index++;
+  name[index] = "COUNT purposes";
+  sql[index] = `
     SELECT COUNT(*) as count_purposes
     FROM purposes
     WHERE business_id = ?
     AND status < 2
+    AND (
+      title LIKE ?
+      OR description LIKE ?
+      OR keywords LIKE ?
+      OR purpose_id LIKE ?
+    )
   `;
-  values[1] = [business_id];
+  values[index] = [business_id, search, search, search, search];
 
   let queries = [
     {
@@ -1873,16 +2258,10 @@ const getPurpose = ({
       sql: sql[0],
       values: values[0],
     },
-
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
 
-  // return db.selectFromDb(queries);
+  queries = pushQueries(queries, name, sql, values, index);
+
   return db.mergeIntoDb(queries);
 };
 
@@ -1937,7 +2316,6 @@ const getShare = ({
 
   queries = pushQueries(queries, name, sql, values, index);
 
-  // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
 };
 
@@ -1961,16 +2339,23 @@ const getPurposeById = ({
   let sql = [];
   let values = [];
 
+  // SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+  // , pp.title, pp.description, pp.category, pp.subcategory, pp.subcategory2, pp.keywords, pp.link, pp.image
+  // FROM purposes AS p
+  // LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
+  // WHERE p.id = ?
+  // AND p.status < 2
+  // AND pp.language = ?
+
   name[0] = "SELECT purposes";
   sql[0] = `
-    SELECT p.id, p.business_id, p.purpose_id, pp.title, pp.description, pp.link, pp.image, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+    SELECT p.id, p.business_id, p.purpose_id, p.status, DATE_FORMAT(p.created, '%Y-%m-%d %H:%i:%s') as created
+    , p.title, p.description, p.keywords
     FROM purposes AS p
-    LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
     WHERE p.id = ? 
     AND p.status < 2
-    AND pp.language = ?
     `; // suspended account status = 2
-  values[0] = [id, language];
+  values[0] = [id];
 
   let queries = [
     {
@@ -2111,23 +2496,35 @@ const getTransactionById = ({
   let sql = [];
   let values = [];
 
+  // SELECT (tp.amount * t.exchange_rate) as conv_amount, tp.to_account, tp.roles, tp.share, tp.share_per_cent,
+  // t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') as created,
+  // u.firstname, u.lastname, u.status AS sender_status,
+  // pp.title AS purpose_title, pp.description AS purpose_description, pp.link AS purpose_link, pp.image AS purpose_image, p.status AS purpose_status,
+  // b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status
+  // FROM transaction_positions AS tp
+  // LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
+  // LEFT JOIN users AS u ON u.uid = t.sender_id
+  // LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
+  // LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
+  // LEFT JOIN businesses as b ON b.business_id = p.business_id
+  // WHERE tp.id = ?
+  // AND pp.language = ?
+
   name[0] = "SELECT transaction_positions";
   sql[0] = `
     SELECT (tp.amount * t.exchange_rate) as conv_amount, tp.to_account, tp.roles, tp.share, tp.share_per_cent,
     t.type, t.currency, t.exchange_rate, t.sender_id, t.purpose_id, t.comment, DATE_FORMAT(t.created, '%Y-%m-%d %H:%i:%s') as created,
     u.firstname, u.lastname, u.status AS sender_status,
-    pp.title AS purpose_title, pp.description AS purpose_description, pp.link AS purpose_link, pp.image AS purpose_image, p.status AS purpose_status,
+    p.title AS purpose_title, p.description AS purpose_description, p.status AS purpose_status,
     b.business_id, b.title AS business_title, b.description AS business_description, b.link AS business_link, b.image AS business_image, b.status AS business_status
     FROM transaction_positions AS tp 
     LEFT JOIN transactions AS t ON t.transaction_id = tp.transaction_id
     LEFT JOIN users AS u ON u.uid = t.sender_id
     LEFT JOIN purposes as p ON p.purpose_id = t.purpose_id
-    LEFT JOIN purpose_props AS pp ON pp.purpose_id = p.purpose_id
     LEFT JOIN businesses as b ON b.business_id = p.business_id
     WHERE tp.id = ?
-    AND pp.language = ?
     `; // suspended account status = 2
-  values[0] = [id, language];
+  values[0] = [id];
 
   let queries = [
     {
@@ -2445,27 +2842,35 @@ const getCart = ({
   customer = null,
   cart = null,
 }) => {
-  let name = [];
-  let sql = [];
-  let values = [];
+  // let name = [];
+  // let sql = [];
+  // let values = [];
 
-  name[0] = "SELECT carts";
-  sql[0] = `
-    SELECT type, cartid, content
-    FROM carts
-    WHERE cartid = ?  
-    AND expiration >= UTC_TIMESTAMP()
-    AND status = 0
+  let { name, sql, values, index } = validateSession({ session });
+
+  index++;
+  name[index] = "SELECT carts";
+  sql[index] = `
+    SELECT c.type, c.cartid, c.content, c.merchant, c.expiration, c.status, c.created
+    , b.title AS business_title, b.description AS business_description, b.status AS business_status, b.created AS business_created, b.owner_id
+    , u.firstname AS owner_firstname, u.lastname AS owner_lastname, u.email AS owner_email, u.language AS owner_language, u.status AS owner_status
+    FROM carts AS c
+    INNER JOIN businesses AS b ON b.business_id = c.merchant
+    INNER JOIN users AS u ON u.uid = b.owner_id
+    WHERE c.cartid = ?  
+    AND c.expiration >= UTC_TIMESTAMP()
+    AND c.status = 0
     `; // suspended account status = 2
-  values[0] = [cart];
+  values[index] = [cart];
 
-  name[1] = "UPDATE carts";
-  sql[1] = `
+  index++;
+  name[index] = "UPDATE carts";
+  sql[index] = `
     UPDATE carts
     SET customer = ?
     WHERE cartid = ?  
     `; // suspended account status = 2
-  values[1] = [customer, cart];
+  values[index] = [customer, cart];
 
   let queries = [
     {
@@ -2481,14 +2886,9 @@ const getCart = ({
       sql: sql[0],
       values: values[0],
     },
-
-    {
-      // query
-      name: name[1],
-      sql: sql[1],
-      values: values[1],
-    },
   ];
+
+  queries = pushQueries(queries, name, sql, values, index);
 
   // return db.selectFromDb(queries);
   return db.mergeIntoDb(queries);
@@ -2597,7 +2997,7 @@ const transferU2U = ({
   return db.mergeIntoDb(queries);
 };
 
-const transferU2B = ({
+const transferU2B_BAK = ({
   // system
   req = null,
   reqData = null,
@@ -2642,8 +3042,9 @@ const transferU2B = ({
     reviser = ?,
     workplace = ?
     WHERE uid = ?
+    AND ${fromAccount} - ? >= 0
     `;
-  values[index] = [amount, reviser, workplace, sender_id];
+  values[index] = [amount, reviser, workplace, sender_id, amount];
 
   index++;
   name[index] = "UPDATE shareholders";
@@ -2651,12 +3052,12 @@ const transferU2B = ({
   UPDATE users AS u
   LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
-  SET u.${toAccount} = u.${toAccount} + ? / 
+  SET u.${toAccount} = u.${toAccount} + ROUND(? /
     (
-      SELECT SUM(s2.share) 
-      FROM shares AS s2 
+      SELECT SUM(s2.share)
+      FROM shares AS s2
       WHERE s2.purpose_id = s1.purpose_id
-    ) * s1.share,
+    ) * s1.share, 5),
   u.reviser = ?,
   u.workplace = ?
   WHERE p.purpose_id = ?
@@ -2682,21 +3083,21 @@ const transferU2B = ({
   name[index] = "INSERT INTO transaction_positions";
   sql[index] = `
   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
-  SELECT '[INSERT_ID]', 
+  SELECT '[INSERT_ID]',
   (
-    ? / 
+    ? /
     (
-      SELECT SUM(s2.share) 
-      FROM shares AS s2 WHERE 
+      SELECT SUM(s2.share)
+      FROM shares AS s2 WHERE
       s2.purpose_id = s1.purpose_id
     ) * s1.share
   ) AS amount,
   s1.shareholder_id, s1.roles, s1.share,
   (
-    100 / 
+    100 /
     (
-      SELECT SUM(s3.share) 
-      FROM shares AS s3 WHERE 
+      SELECT SUM(s3.share)
+      FROM shares AS s3 WHERE
       s3.purpose_id = s1.purpose_id
     ) * s1.share
   ) AS share_per_cent,
@@ -2708,7 +3109,7 @@ const transferU2B = ({
   `;
   values[index] = [amount, purpose_id];
 
-  const queries = [
+  let queries = [
     {
       // system
       req: req,
@@ -2731,6 +3132,332 @@ const transferU2B = ({
 
   return db.mergeIntoDb(queries);
 };
+
+const transferU2B = ({
+  // system
+  req = null,
+  reqData = null,
+  session = null,
+  onStatusChange = () => {},
+  onError = () => {},
+
+  // user args
+  uid = null,
+  sender_id = null,
+  fromAccount = null,
+  toAccount = "acc_curr",
+  purpose_id = null,
+  currency = "Z",
+  amount = null,
+  description = null,
+  cart = null,
+  merchant = null,
+  reviser = null,
+  workplace = null,
+}) => {
+  if (amount <= 0) {
+    onError({
+      req: req,
+      reqData: reqData,
+      session: session,
+      error: { code: "INVALID_AMOUNT" },
+      context: ["db.js", "transferU2B", "amount <= 0"],
+    });
+    return;
+  }
+
+  // let name = []; // query name
+  // let sql = [];
+  // let values = [];
+
+  let { name, sql, values, index } = validateSession({ session });
+
+  purpose_id.forEach((p, i) => {
+    index++;
+    name[index] = "UPDATE sender";
+    sql[index] = `
+      UPDATE users
+      SET ${fromAccount[i]} = ${fromAccount[i]} - ?,
+      reviser = ?,
+      workplace = ?
+      WHERE uid = ?
+      AND ${fromAccount[i]} - ? >= 0
+      `;
+    values[index] = [amount[i], reviser, workplace, sender_id, amount[i]];
+
+    index++;
+    name[index] = "UPDATE shareholders";
+    sql[index] = `
+      UPDATE users AS u
+      LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
+      LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+      SET u.${toAccount} = u.${toAccount} + ROUND(? /
+        (
+          SELECT SUM(s2.share)
+          FROM shares AS s2
+          WHERE s2.purpose_id = s1.purpose_id
+        ) * s1.share, 5),
+      u.reviser = ?,
+      u.workplace = ?
+      WHERE p.purpose_id = ?
+      `;
+    values[index] = [amount[i], reviser, workplace, purpose_id[i]];
+
+    index++;
+    name[index] = "INSERT INTO transactions";
+    sql[index] = `
+      INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, purpose_id, merchant, comment, created, reviser, workplace)
+      VALUES (?, ?, ?, (SELECT rate FROM currencies WHERE abbr = ?), ?, ?, ?, ?, UTC_TIMESTAMP(), 'SYS', 'SYSTEM')`;
+    values[index] = [
+      req,
+      amount[i],
+      currency[i],
+      currency[i],
+      sender_id,
+      purpose_id[i],
+      merchant,
+      description,
+    ];
+
+    index++;
+    name[index] = "INSERT INTO transaction_positions";
+    sql[index] = `
+      INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
+      SELECT '[INSERT_ID]',
+      (
+        ? /
+        (
+          SELECT SUM(s2.share)
+          FROM shares AS s2 WHERE
+          s2.purpose_id = s1.purpose_id
+        ) * s1.share
+      ) AS amount,
+      s1.shareholder_id, s1.roles, s1.share,
+      (
+        100 /
+        (
+          SELECT SUM(s3.share)
+          FROM shares AS s3 WHERE
+          s3.purpose_id = s1.purpose_id
+        ) * s1.share
+      ) AS share_per_cent,
+      '${fromAccount[i]}', '${toAccount}', UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM'
+      FROM shares AS s1
+      LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+      LEFT JOIN users AS u ON u.uid = s1.shareholder_id
+      WHERE s1.purpose_id = ?
+      `;
+    values[index] = [amount[i], purpose_id[i]];
+  });
+
+  /**
+   * Set cart status to payed (1)
+   */
+  if (cart !== null) {
+    index++;
+    name[index] = "UPDATE carts";
+    sql[index] = `
+      UPDATE carts
+      SET status = 1
+      WHERE cartid = ?
+      AND status = 0
+      `;
+    values[index] = [cart];
+  }
+
+  let queries = [
+    {
+      // system
+      req: req,
+      reqData: reqData,
+      session: session,
+      onStatusChange: onStatusChange,
+      onError: onError,
+
+      // user
+      uid: uid,
+
+      // query
+      name: name[0],
+      sql: sql[0],
+      values: values[0],
+    },
+  ];
+
+  queries = pushQueries(queries, name, sql, values, index);
+
+  return db.mergeIntoDb(queries);
+};
+
+// const transferU2B = (args) => {
+//   const { req, reqData, session, onStatusChange, onError, uid } = args;
+
+//   let { name, sql, values, index } = validateSession({ session });
+
+//   let queries = [];
+//   args.transfers.forEach((transfer) => {
+//     transfer.req = req;
+//     transfer.reqData = reqData;
+//     transfer.session = session;
+//     transfer.onStatusChange = onStatusChange;
+//     transfer.onError = onError;
+//     transfer.uid = uid; // is it really necessary?
+
+//     transfer.name = name;
+//     transfer.sql = sql;
+//     transfer.values = values;
+//     transfer.index = index;
+//     console.log("transfer2:", transfer);
+
+//     queries = addTransferU2B(transfer);
+//   });
+
+//   // let queries = addTransferU2B(args);
+
+//   queries[0].req = req;
+//   queries[0].reqData = reqData;
+//   queries[0].session = session;
+//   queries[0].onStatusChange = onStatusChange;
+//   queries[0].onError = onError;
+//   queries[0].uid = uid; // is it really necessary?
+
+//   // return [
+//   //   {
+//   //     // system
+//   //     req: req,
+//   //     reqData: reqData,
+//   //     session: session,
+//   //     onStatusChange: onStatusChange,
+//   //     onError: onError,
+
+//   //     // user
+//   //     uid: uid,
+
+//   //     // query
+//   //     name: name[0],
+//   //     sql: sql[0],
+//   //     values: values[0],
+//   //   },
+//   // ];
+
+//   return db.mergeIntoDb(queries);
+// };
+
+// const addTransferU2B = ({
+//   // system
+//   req = null,
+//   reqData = null,
+//   session = null,
+//   onStatusChange = () => {},
+//   onError = () => {},
+
+//   // user args
+//   uid = null,
+//   sender_id = null,
+//   fromAccount = null,
+//   toAccount = "acc_curr",
+//   purpose_id = null,
+//   currency = "Z",
+//   amount = null,
+//   description = null,
+//   reviser = null,
+//   workplace = null,
+
+//   // out vars
+//   // transferID = 0,
+//   queries = [],
+//   name = [],
+//   sql = [],
+//   values = [],
+//   index = 0,
+// }) => {
+//   if (amount <= 0) {
+//     onError({
+//       req: req,
+//       reqData: reqData,
+//       session: session,
+//       error: { code: "INVALID_AMOUNT" },
+//       context: ["db.js", "transferU2B", "amount <= 0"],
+//     });
+//     return;
+//   }
+
+//   index++;
+//   name[index] = "UPDATE sender";
+//   sql[index] = `
+//     UPDATE users
+//     SET ${fromAccount} = ${fromAccount} - ?,
+//     reviser = ?,
+//     workplace = ?
+//     WHERE uid = ?
+//     `;
+//   values[index] = [amount, reviser, workplace, sender_id];
+
+//   index++;
+//   name[index] = "UPDATE shareholders";
+//   sql[index] = `
+//   UPDATE users AS u
+//   LEFT JOIN shares AS s1 ON s1.shareholder_id = u.uid
+//   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+//   SET u.${toAccount} = u.${toAccount} + ROUND(? /
+//     (
+//       SELECT SUM(s2.share)
+//       FROM shares AS s2
+//       WHERE s2.purpose_id = s1.purpose_id
+//     ) * s1.share, 5),
+//   u.reviser = ?,
+//   u.workplace = ?
+//   WHERE p.purpose_id = ?
+//   `;
+//   values[index] = [amount, reviser, workplace, purpose_id];
+
+//   index++;
+//   name[index] = "INSERT INTO transactions";
+//   sql[index] = `
+//   INSERT INTO transactions (type, amount, currency, exchange_rate, sender_id, purpose_id, comment, created, reviser, workplace)
+//   VALUES (?, ?, ?, (SELECT rate FROM currencies WHERE abbr = ?), ?, ?, ?, UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM')`;
+//   values[index] = [
+//     req,
+//     amount,
+//     currency,
+//     currency,
+//     sender_id,
+//     purpose_id,
+//     description,
+//   ];
+
+//   index++;
+//   name[index] = "INSERT INTO transaction_positions";
+//   sql[index] = `
+//   INSERT INTO transaction_positions (transaction_id, amount, recipient_id, roles, share, share_per_cent, from_account, to_account, created, reviser, workplace)
+//   SELECT '[INSERT_ID]',
+//   (
+//     ? /
+//     (
+//       SELECT SUM(s2.share)
+//       FROM shares AS s2 WHERE
+//       s2.purpose_id = s1.purpose_id
+//     ) * s1.share
+//   ) AS amount,
+//   s1.shareholder_id, s1.roles, s1.share,
+//   (
+//     100 /
+//     (
+//       SELECT SUM(s3.share)
+//       FROM shares AS s3 WHERE
+//       s3.purpose_id = s1.purpose_id
+//     ) * s1.share
+//   ) AS share_per_cent,
+//   '${fromAccount}', '${toAccount}', UTC_TIMESTAMP(), 'SYSTEM', 'SYSTEM'
+//   FROM shares AS s1
+//   LEFT JOIN purposes AS p ON p.purpose_id = s1.purpose_id
+//   LEFT JOIN users AS u ON u.uid = s1.shareholder_id
+//   WHERE s1.purpose_id = ?
+//   `;
+//   values[index] = [amount, purpose_id];
+
+//   return pushQueries(queries, name, sql, values, index);
+// };
 
 /**
  * Transfer the allowance
@@ -3026,6 +3753,10 @@ const updatePurposeProps = ({
   language = null,
   title = null,
   description = null,
+  category = null,
+  subcategory = null,
+  subcategory2 = null,
+  keywords = null,
   link = null,
   image = null,
   status = 0,
@@ -3038,42 +3769,42 @@ const updatePurposeProps = ({
 
   let { name, sql, values, index } = validateSession({ session });
 
+  // INSERT INTO purpose_props (purpose_id, language, title, description, category, subcategory, subcategory2, keywords, link, image, status, created, reviser, workplace)
+  // VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
+  // ON DUPLICATE KEY UPDATE
+  // title = COALESCE(?, title)
+  // , description = COALESCE(?, description)
+  // , category = COALESCE(?, category)
+  // , subcategory = COALESCE(?, subcategory)
+  // , subcategory2 = COALESCE(?, subcategory2)
+  // , keywords = COALESCE(?, keywords)
+  // , link = COALESCE(?, link)
+  // , image = COALESCE(?, image)
+  // , status = COALESCE(?, status)
+  // , reviser = COALESCE(?, reviser)
+  // , workplace = COALESCE(?, workplace)
+
   index++;
   name[index] = "MERGE purpose_props";
   sql[index] = `
-  INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
-  VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
-  ON DUPLICATE KEY UPDATE
-  title = COALESCE(?, title)
-  , description = COALESCE(?, description)
-  , link = COALESCE(?, link)
-  , image = COALESCE(?, image)
-  , status = COALESCE(?, status)
-  , reviser = COALESCE(?, reviser)
-  , workplace = COALESCE(?, workplace)
+  UPDATE purposes SET
+  title = COALESCE(?, title), 
+  description = COALESCE(?, description), 
+  keywords = COALESCE(?, keywords), 
+  status = status = COALESCE(?, status),
+  reviser = COALESCE(?, reviser), 
+  workplace = COALESCE(?, workplace)
+  WHERE purpose_id = ?
   `;
   values[index] = [
-    // insert vars
-    purpose_id,
-    language,
-    title,
-    description,
-    link,
-    image,
-    status,
-    reviser,
-    workplace,
-
     // update vars
     title,
     description,
-    link,
-    image,
+    keywords,
     status,
     reviser,
     workplace,
     purpose_id,
-    language,
   ];
 
   let queries = [
@@ -3114,6 +3845,10 @@ const addPurpose = ({
   purpose_id = null,
   title = null,
   description = null,
+  category = null,
+  subcategory = null,
+  subcategory2 = null,
+  keywords = null,
   link = null,
   image = null,
   status = 0,
@@ -3129,8 +3864,8 @@ const addPurpose = ({
   index++;
   name[index] = "INSERT INTO purposes";
   sql[index] = `
-  INSERT INTO purposes (business_id, purpose_id, title, description, status, created, reviser, workplace)
-  VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
+  INSERT INTO purposes (business_id, purpose_id, title, description, keywords, status, created, reviser, workplace)
+  VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?)
   `;
   values[index] = [
     // insert vars
@@ -3138,27 +3873,32 @@ const addPurpose = ({
     purpose_id,
     title,
     description,
+    keywords,
     status, // status,
     reviser,
     workplace,
   ];
 
-  index++;
-  name[index] = "INSERT INTO purpose_props";
-  sql[index] = `
-  INSERT INTO purpose_props (purpose_id, language, title, description, link, image, status, created, reviser, workplace)
-  VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(), ?, ?)
-  `;
-  values[index] = [
-    /* Insert values */
-    language,
-    title,
-    description,
-    link,
-    image,
-    reviser,
-    workplace,
-  ];
+  // index++;
+  // name[index] = "INSERT INTO purpose_props";
+  // sql[index] = `
+  // INSERT INTO purpose_props (purpose_id, language, title, description, category, subcategory, subcategory2, keywords, link, image, status, created, reviser, workplace)
+  // VALUES ( (SELECT purpose_id FROM purposes WHERE id = [INSERT_ID]), ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, UTC_TIMESTAMP(), ?, ?)
+  // `;
+  // values[index] = [
+  //   /* Insert values */
+  //   language,
+  //   title,
+  //   description,
+  //   category,
+  //   subcategory,
+  //   subcategory2,
+  //   keywords,
+  //   link,
+  //   image,
+  //   reviser,
+  //   workplace,
+  // ];
 
   let queries = [
     {
@@ -3468,7 +4208,7 @@ const unknownRequest = ({
   sql[0] = `SELECT 'unknown request' AS error`;
   values[0] = [];
 
-  const queries = [
+  let queries = [
     {
       // system
       req: req,
@@ -3499,55 +4239,59 @@ eventEmitter.on("error", function (err) {
 module.exports = {
   // setSocket: setSocket,
   // addCurrency: addCurrency,
-  getSequence: getSequence,
-  mergeUser: mergeUser,
-  endSession: endSession,
-  mergeSession: mergeSession,
-  mergeBusiness: mergeBusiness,
-  mergeCurrency: mergeCurrency,
-  // emitCurrency: emitCurrency,
-  getTAN: getTAN,
-  processTAN: processTAN,
-  saveCart: saveCart,
-  getCart: getCart,
-  transferU2S: transferU2S,
-  transferU2U: transferU2U,
-  transferU2B: transferU2B,
-  transferV2U: transferV2U,
-  // transferP2B: transferP2B,
-  // initUser: initUser,
-  getUriSettings: getUriSettings,
-  signInUser: signInUser,
-  // lastSeenUser: lastSeenUser,
-  resetPassword: resetPassword,
-  getUser: getUser,
-  uploadFile: uploadFile,
-  getAccount: getAccount,
-  getBusiness: getBusiness,
-  getBusinessById: getBusinessById,
-  getCartPurposes: getCartPurposes,
-  getPurpose: getPurpose,
-  getPurposeById: getPurposeById,
-  getShare: getShare,
-  getShareholderById: getShareholderById,
-  getCurrencyById: getCurrencyById,
-  getTransactionById: getTransactionById,
-  getCurrencies: getCurrencies,
-  getTransactions: getTransactions,
-  getShares: getShares,
-  updatePurposeProps: updatePurposeProps,
-  addPurpose: addPurpose,
-  changePurposeStatus: changePurposeStatus,
-  mergeShareholder: mergeShareholder,
-  removeShareholder: removeShareholder,
-  saveMessage: saveMessage,
-  // mergeShares: mergeShares,
-  // mergePool: mergePool,
-  // mergePoolUsers: mergePoolUsers,
-  mergeUserLanguage: mergeUserLanguage,
-  mergeUserCurrency: mergeUserCurrency,
-  validateEmailToken: validateEmailToken,
-  resendValidateEmailToken: resendValidateEmailToken,
-  validatePasswordResetToken: validatePasswordResetToken,
-  unknownRequest: unknownRequest,
+  getSequence,
+  mergeUser,
+  endSession,
+  mergeSession,
+  mergeBusiness,
+  mergeCurrency,
+  // emitCurrency,
+  getTAN,
+  processTAN,
+  saveCart,
+  getCart,
+  transferU2S,
+  transferU2U,
+  transferU2B,
+  // transferU2BMulti,
+  transferV2U,
+  // transferP2B,
+  // initUser,
+  getUriSettings,
+  signInUser,
+  // lastSeenUser,
+  resetPassword,
+  getUser,
+  uploadFile,
+  getAccount,
+  getValidateSession,
+  getBusiness,
+  getBusinessById,
+  getCartPurposes,
+  getPurpose,
+  getPurposeById,
+  getShare,
+  getShareholderById,
+  getCurrencyById,
+  getTransactionById,
+  getCurrencies,
+  // findCurrencies,
+  getTransactions,
+  // findTransactions,
+  getShares,
+  updatePurposeProps,
+  addPurpose,
+  changePurposeStatus,
+  mergeShareholder,
+  removeShareholder,
+  saveMessage,
+  //  mergeShares,
+  //  mergePool,
+  //  mergePoolUsers,
+  mergeUserLanguage,
+  mergeUserCurrency,
+  validateEmailToken,
+  resendValidateEmailToken,
+  validatePasswordResetToken,
+  unknownRequest,
 };

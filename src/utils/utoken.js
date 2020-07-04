@@ -1,5 +1,6 @@
+const config = require("./config");
 const crypto = require("./crypto");
-const timeout = 15 * 60; // timeout: 10 = 10 seconds | 5 * 60 = 5 minutes
+const timeout = config.mode === "PRODUCTION" ? 15 * 60 : 360 * 60; // timeout: 10 = 10 seconds | 5 * 60 = 5 minutes
 const renew = 2 * 60; // suggest a token to be renewed n seconds before expiration
 
 /**

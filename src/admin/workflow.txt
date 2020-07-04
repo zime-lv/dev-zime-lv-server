@@ -1,7 +1,37 @@
 =======================================================================
 
+Email:
+TXT:
+v=spf1 +a +mx +ip4:85.215.83.34 -all
+
+MX:
+mail.local-currency.com IP: 85.215.83.34 Preference: 50 
+
+=======================================================================
+
+Plesk enable DKIM Spam Protection under Tools & Settings -> Mail Server Settings
+
+1. Login to the server via SSH
+
+2. Private keys are located in the corresponding domain directory in /etc/domainkeys/
+/etc/domainkeys/local-currency.com -> default
+
+3. To extract a public key from a private, run the following:
+openssl rsa -in /etc/domainkeys/example.com/default -pubout
+
+4. Merge the result of the command above into one string, and add it as a TXT record for the domain on external DNS server
+Prefix: default._domainkey
+Value (e.g.): v=DKIM1;k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC+aOU9Dw2Qedi6qOEcpbGQ3pHVI8SonKGNSBBgiImChx6k6I7s1UqeCzaHpKXKLIY4GA601gloVCnnTumZ/5TxnviBHg1a2lsatt/gCj2pl61a+uALM1oRdgPhxPYefloFpi0lau8thV6u9BYTfUgfqIF+dvFIVlu0MULsWDDJfwIDAQAB
+
+=======================================================================
+
+Test mail:
+mail-tester.com
+
+=======================================================================
+
 Plesk directory:
-/var/www/vhosts/zime.lv/www/dev.zime.lv
+/var/www/vhosts/local-currency.com/www/dev.local-currency.com
 
 Plesk increase storage space by removing backups:
 - Use WinSCP (un: root)
@@ -76,11 +106,11 @@ Set up server:
 =======================================================================
 
 Contact name: ZIME Service
-Email address: service@zime.lv
+Email address: service@local-currency.com
 External email address: strazds@gmail.com
 User role: Administrator (? necessary ?)
 Access to subscriptions: All (? necessary ?)
-Username: service@zime.lv
+Username: service@local-currency.com
 Password: hajgfd_36754_JSZDM
 User is active: check
 
@@ -144,7 +174,7 @@ Finishing a release branch:
 -------------------------------------
 git checkout master
 git merge --no-ff release-0.0.6
-git tag -a 0.0.6 -m "Released v0.0.6 for dev.zime.lv"
+git tag -a 0.0.6 -m "Released v0.0.6 for dev.local-currency.com"
 git checkout develop
 git merge --no-ff release-0.0.6
 git branch -d release-0.0.6

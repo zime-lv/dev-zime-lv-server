@@ -24,6 +24,7 @@ const dev = {
     password: crypto.decrypt(process.env.DEV_DB_PASS),
     database: process.env.DEV_DB,
   },
+  mode: "DEVELOPMENT",
 };
 
 const staging = {
@@ -36,6 +37,7 @@ const staging = {
     password: crypto.decrypt(process.env.STAGING_DB_PASS),
     database: process.env.STAGING_DB,
   },
+  mode: "STAGING",
 };
 
 const prod = {
@@ -48,6 +50,7 @@ const prod = {
     password: crypto.decrypt(process.env.PROD_DB_PASS),
     database: process.env.PROD_DB,
   },
+  mode: "PRODUCTION",
 };
 
 let config;

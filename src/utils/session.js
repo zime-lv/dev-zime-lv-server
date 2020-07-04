@@ -52,27 +52,16 @@ const validateToken = (args) => {
   const email = args.results.email;
 
   const { status: valid, renew } = utoken.validate(token, iv, email); // "abc" | email
-  console.log("ADARGSTIXVIX", valid, renew);
 
-  //   delete args.results.token;
   delete args.results.iv;
-  //   delete args.results.email;
-
-  // delete args.results;
 
   if (valid) {
-    // const newToken = renewToken(email, args);
-    // args.newToken = newToken;
-
     if (renew) {
       args = saveToken(email, args);
-    } else {
-      // args.token = token;
     }
 
     return args;
   } else {
-    // args = {};
     delete args.results;
     delete args.reqData;
 

@@ -112,13 +112,13 @@ START SLAVE
 -- (Apply the CluserIP to the Server and Domain):
 -- ClusterIP:
 -- 1) Plesk -> Tools & Settings -> IP Addresses -> Click on "Reread IP"
--- 2) Plesk -> Websites & Domains ->  zime.lv -> Web Hosting Access -> IP Address -> Select the CluserIP Address
+-- 2) Plesk -> Websites & Domains ->  local-currency.com -> Web Hosting Access -> IP Address -> Select the CluserIP Address
 -- 3) Point the DNS A-Record of the domain name to the CluserIP Address.
 
 -- (Apply the CluserIP to the Server and Domain):
 -- ClusterIP:
 -- 1) Plesk -> Tools & Settings -> IP Addresses -> Click on "Reread IP"
--- 2) Plesk -> Websites & Domains ->  zime.lv -> Web Hosting Access -> IP Address -> Select the CluserIP Address
+-- 2) Plesk -> Websites & Domains ->  local-currency.com -> Web Hosting Access -> IP Address -> Select the CluserIP Address
 -- 3) Point the DNS A-Record of the domain name to the CluserIP Address.
 
 -- (Useful commands)

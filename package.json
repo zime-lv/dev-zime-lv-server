@@ -1,8 +1,8 @@
 {
-  "name": "zime-lv-server",
+  "name": "local-currency-server",
   "homepage": ".",
   "version": "0.0.7",
-  "description": "ZIME LV Server",
+  "description": "Local Currency Server",
   "private": true,
   "dependencies": {
     "dotenv": "^8.2.0",
@@ -27,14 +27,18 @@
     "build": "webpack",
     "predeploy": "npm run build",
     "deploy": "gh-pages -b master -d build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "git remote set-url origin https://github.com/zime-lv/dev-zime-lv-server.git",
+    "live": "git remote set-url origin https://github.com/zime-lv/zime-lv-server.git",
+    "deploy_dev": "(npm run dev) && (npm run deploy)",
+    "deploy_live": "(npm run live) && (npm run deploy)"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zime-lv/dev-zime-lv.git"
   },
   "keywords": [
-    "zime, local currencies, regional currencies"
+    "local currencies, regional currencies, complementary currencies, spending, zime"
   ],
   "author": "Armands Strazds",
   "license": "ISC",

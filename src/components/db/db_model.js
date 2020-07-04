@@ -183,12 +183,14 @@ const doQuery = (data) => {
       // the field packets for the rows to follow
     })
     .on("result", (results) => {
-      // console.log("MERGE CONNECTION RESULT:", results);
+      console.log("MERGE CONNECTION RESULT:", results);
 
       if (
         !(flags & dbTypes.dbMergeFlags.ALLOW_UNCHANGED_ROWS) &&
         results.insertId === 0 &&
-        results.changedRows === 0
+        results.changedRows === 0 &&
+        results.affectedRows === 0
+        // query.sql.indexOf("DELETE FROM") === -1
       ) {
         return connection.rollback(function () {
           onError({

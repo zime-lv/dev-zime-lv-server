@@ -7,7 +7,12 @@ git checkout -b release-0.0.7 develop
 3. Increase version number of the package
 -------------------------------------
 In package.json:
-Change version to 0.0.7.
+- Change name to (server) "local-currency-server" (client) "dev-zime-lv"
+- Change version to 0.0.7.
+
+2. Change git remote:
+(server) git remote set-url origin https://github.com/zime-lv/dev-zime-lv-server.git
+(client) git remote set-url origin https://github.com/zime-lv/dev-zime-lv.git
 
 4. Commit changes
 -------------------------------------
@@ -20,7 +25,7 @@ git commit -a -m "Bumped version number to 0.0.7"
 -------------------------------------
 git checkout master
 git merge --no-ff release-0.0.7
-git tag -a 0.0.7 -m "Released v0.0.7 for dev.zime.lv / zime.lv"
+git tag -a 0.0.7 -m "Released v0.0.7 for dev.local-currency.com / local-currency.com"
 git checkout develop
 git merge --no-ff release-0.0.7
 git branch -d release-0.0.7

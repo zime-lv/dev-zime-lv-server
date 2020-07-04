@@ -11,7 +11,7 @@ const { v4: uuidv4 } = require("uuid");
 const db = require("../db/db");
 const processError = require("../processError/ProcessError");
 const processEvent = require("../processEvent/ProcessEvent");
-const utoken = require("../../utils/utoken");
+// const utoken = require("../../utils/utoken");
 
 let onResult = null;
 
@@ -143,10 +143,30 @@ const userRequest = (args) => {
         // user
         uid: userData.uid,
         language: userData.language,
+        dateStart: userData.dateStart,
+        dateEnd: userData.dateEnd,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
       break;
+
+    // case "find transactions":
+    //   db.findTransactions({
+    //     // system
+    //     req: data.req,
+    //     session: data.session,
+    //     reqData: userData,
+    //     onStatusChange: onStatusChange,
+    //     onError: onRequestError,
+
+    //     // user
+    //     uid: userData.uid,
+    //     search: userData.search,
+    //     page: userData.page - 1,
+    //     limit: userData.limit,
+    //   });
+    //   break;
 
     case "get shares":
       db.getShares({
@@ -160,6 +180,7 @@ const userRequest = (args) => {
         // user
         uid: userData.uid,
         language: userData.language,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
@@ -295,8 +316,6 @@ const userRequest = (args) => {
       break;
 
     case "update user":
-      // if (!validateSession(data.session, userData.email)) return;
-
       db.mergeUser({
         // system
         req: data.req,
@@ -307,6 +326,9 @@ const userRequest = (args) => {
 
         // user
         email: userData.email,
+        newEmail:
+          typeof userData.newEmail === "undefined" ? null : userData.newEmail,
+        validateEmail: userData.validateEmail,
         uid: userData.personalID,
         firstname: userData.firstName,
         lastname: userData.lastName,
@@ -450,10 +472,29 @@ const userRequest = (args) => {
         onError: onRequestError,
 
         // user
+        uid: userData.uid,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
       break;
+
+    // case "find currencies":
+    //   db.findCurrencies({
+    //     // system
+    //     req: data.req,
+    //     session: data.session,
+    //     reqData: userData,
+    //     onStatusChange: onStatusChange,
+    //     onError: onRequestError,
+
+    //     // user
+    //     uid: userData.uid,
+    //     search: userData.search,
+    //     page: userData.page - 1,
+    //     limit: userData.limit,
+    //   });
+    //   break;
 
     case "register user language":
       db.mergeUserLanguage({
@@ -487,6 +528,17 @@ const userRequest = (args) => {
       });
       break;
 
+    case "validate session":
+      db.getValidateSession({
+        // system
+        req: data.req,
+        session: data.session,
+        reqData: userData,
+        onStatusChange: onStatusChange,
+        onError: onRequestError,
+      });
+      break;
+
     case "get user businesses":
       db.getBusiness({
         // system
@@ -516,6 +568,7 @@ const userRequest = (args) => {
         // user
         business_id: userData.business_id,
         language: userData.language,
+        search: userData.search,
         page: userData.page - 1,
         limit: userData.limit,
       });
@@ -679,6 +732,10 @@ const userRequest = (args) => {
         business_id: userData.businessID,
         title: userData.purposeTitle,
         description: userData.purposeDescription,
+        category: userData.purposeCategory,
+        subcategory: userData.purposeSubcategory,
+        subcategory2: userData.purposeSubcategory2,
+        keywords: userData.purposeKeywords,
         reviser: userData.reviser,
         workplace: userData.workplace,
       });
@@ -714,6 +771,10 @@ const userRequest = (args) => {
         purpose_id: userData.purposeID,
         title: userData.purposeTitle,
         description: userData.purposeDescription,
+        category: userData.purposeCategory,
+        subcategory: userData.purposeSubcategory,
+        subcategory2: userData.purposeSubcategory2,
+        keywords: userData.purposeKeywords,
         language: userData.language,
         reviser: userData.reviser,
         workplace: userData.workplace,
@@ -830,8 +891,6 @@ const userRequest = (args) => {
       break;
 
     case "get tan":
-      // if (!validateSession(data.session, userData.email)) return;
-
       db.getTAN({
         // system
         req: data.req,
@@ -917,12 +976,17 @@ const userRequest = (args) => {
 
         // user
         uid: data.uid,
+
+        // transfers: userData.transfers,
         sender_id: userData.uid,
         fromAccount: userData.fromAccount,
         purpose_id: userData.purposeID,
         currency: userData.currency,
         amount: userData.amount,
         description: userData.description,
+        cart: typeof userData.cart === "undefined" ? null : userData.cart,
+        merchant:
+          typeof userData.merchant === "undefined" ? null : userData.merchant,
         reviser: userData.reviser,
         workplace: userData.workplace,
       });
