@@ -173,11 +173,11 @@ git commit -a -m "Bumped version number to 0.0.6"
 Finishing a release branch:
 -------------------------------------
 git checkout master
-git merge --no-ff release-0.0.6
-git tag -a 0.0.6 -m "Released v0.0.6 for dev.local-currency.com"
+git merge --no-ff release-0.0.7
+git tag -a 0.0.7 -m "Released v0.0.7 for local-currency.com"
 git checkout develop
-git merge --no-ff release-0.0.6
-git branch -d release-0.0.6
+git merge --no-ff release-0.0.7
+git branch -d release-0.0.7 (only after client + server + ... are merged)
 
 Creating the hotfix branch:
 -------------------------------------

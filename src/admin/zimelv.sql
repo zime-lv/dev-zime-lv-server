@@ -270,6 +270,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     INDEX `index_purpose` (`purpose_id`),
     INDEX `index_merchant` (`merchant`)
 ) ENGINE = InnoDB COMMENT = 'transactions';
+-- ALTER TABLE `transactions` ADD `merchant` VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT 'merchants business ID' AFTER `purpose_id`;
 
 --
 -- Transaction positions
@@ -416,6 +417,61 @@ CREATE TABLE IF NOT EXISTS user_connection (
     UNIQUE KEY unique_user_connection (`email`, `timezone`, `city`, `area`),
     INDEX `index_email` (`email`)
 ) ENGINE = InnoDB COMMENT = 'user_connection';
+
+--
+-- Jobs
+--
+CREATE TABLE IF NOT EXISTS jobs (
+    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
+    `jobid` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job id",
+    `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job title",
+    `subsidiary` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job subsidiary",
+    `country` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job country",
+    `location` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job location",
+    `primary_location` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job primary location",
+    `additional_locations` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job additional locations",
+    `type` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job type",
+    `experience` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job experience",
+    `description` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job description",
+    `classification` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "job classification",
+    `travel_percent` int(1) NOT NULL DEFAULT 0 COMMENT "travel percent",
+    `submitter` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "user id of submitter",
+    `status` int(1) NOT NULL DEFAULT 0 COMMENT "cart status",
+    `created` datetime NULL  COMMENT "creation date and time",
+    `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
+    `workplace` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "workplace",
+    `ts` timestamp NOT NULL  COMMENT "timestamp",
+    PRIMARY KEY (`id`),
+    FOREIGN KEY(`submitter`) REFERENCES users(`uid`),
+    FULLTEXT(title, description),
+    UNIQUE KEY unique_cart (`jobid`),
+    INDEX `index_title` (`title`),
+    INDEX `index_jobid` (`jobid`)
+) ENGINE = InnoDB COMMENT = 'jobs';
+
+--
+-- Articles
+--
+CREATE TABLE IF NOT EXISTS articles (
+    `id` int(11) unsigned NOT NULL auto_increment COMMENT "primary key",
+    `language` varchar(2) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "language code",
+    `type` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "document type",
+    `path1` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "article path 1",
+    `path2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "article path 2",
+    `path3` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "article path 3",
+    `title` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "article title",
+    `text` TEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "article text",
+    `submitter` varchar(24) CHARACTER SET utf8 COLLATE utf8_general_ci NULL COMMENT "user id of submitter",
+    `status` int(1) NOT NULL DEFAULT 0 COMMENT "cart status",
+    `created` datetime NULL  COMMENT "creation date and time",
+    `reviser` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "reviser",
+    `workplace` varchar(36) CHARACTER SET utf8 COLLATE utf8_general_ci NULL  COMMENT "workplace",
+    `ts` timestamp NOT NULL  COMMENT "timestamp",
+    PRIMARY KEY (`id`),
+    FOREIGN KEY(`submitter`) REFERENCES users(`uid`),
+    FULLTEXT(title, text),
+    INDEX `index_title` (`title`)
+) ENGINE = InnoDB COMMENT = 'articles';
 
 --
 -- Trigger, creates Business ID, 20 chars long

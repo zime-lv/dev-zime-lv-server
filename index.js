@@ -28,7 +28,8 @@ const processRequest = require("./src/components/processRequest/ProcessRequest")
 
 server.listen(PRODUCTION_MODE ? 443 : 9000);
 
-app.use(express.static(__dirname + "/_client"));
+// app.use(express.static(__dirname + "/_client"));
+app.use(express.static(__dirname + "/_client/static"));
 
 app.use(express.json()); // to support JSON-encoded bodies
 app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
@@ -141,7 +142,6 @@ app.get("/", function (req, res) {
 
 // app.get("/*", function (req, res) {
 app.get("*", function (req, res) {
-  // const filePath = "./_client/index.html";
   const filePath = "./_client/index.html";
   const resolvedPath = path.resolve(filePath);
   console.log("resolvedPath:", resolvedPath);
